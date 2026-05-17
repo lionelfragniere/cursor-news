@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Fixture News</title>
+    <link>https://example.test</link>
+    <description>Feed fixture</description>
+    <item>
+      <title>La Suisse teste un nouveau service public numerique</title>
+      <link>https://example.test/suisse/service-public</link>
+      <pubDate>Sun, 17 May 2026 06:00:00 GMT</pubDate>
+      <description><![CDATA[Un projet pilote simplifie les demarches administratives dans plusieurs cantons romands.]]></description>
+    </item>
+    <item>
+      <title>La France presente un plan energie</title>
+      <link>https://example.test/france/energie</link>
+      <pubDate>Sun, 17 May 2026 06:05:00 GMT</pubDate>
+      <description><![CDATA[Le gouvernement annonce de nouvelles mesures pour securiser l'approvisionnement.]]></description>
+    </item>
+  </channel>
+</rss>

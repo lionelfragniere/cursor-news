@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursor News</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/logo.webp" alt="Cursor News" />
+          <div>
+            <p class="eyebrow">Suisse romande</p>
+            <h1>Cursor News</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="access-controls" aria-label="Préférences de lecture">
+            <button id="text-size-toggle" class="access-btn" type="button" aria-pressed="false">A+</button>
+            <button id="contrast-toggle" class="access-btn" type="button" aria-pressed="false">Contraste</button>
+          </div>
+          <div class="status" id="data-status">Chargement...</div>
+        </div>
+      </header>
+
+      <section class="player-band" aria-label="Lecteur radio Cursor News">
+        <div>
+          <p class="eyebrow">Radio</p>
+          <h2>Flux audio en boucle</h2>
+        </div>
+        <audio
+          id="radio-player"
+          controls
+          loop
+          preload="metadata"
+          src="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3"
+        ></audio>
+      </section>
+
+      <section class="transcript-band" aria-label="Transcript du bulletin courant">
+        <div class="transcript-head">
+          <div>
+            <p class="eyebrow">Bulletin courant</p>
+            <h2 id="bulletin-title">Chargement du bulletin</h2>
+          </div>
+          <a id="bulletin-audio-link" href="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3">Audio direct</a>
+        </div>
+        <p class="summary" id="bulletin-summary"></p>
+        <details>
+          <summary>Lire le transcript</summary>
+          <article class="transcript" id="bulletin-transcript"></article>
+        </details>
+      </section>
+
+      <section class="filters" aria-label="Filtres des actualités">
+        <div class="search-row">
+          <label>
+            <span>Recherche</span>
+            <input id="search" type="search" placeholder="Sujet, lieu, source..." />
+          </label>
+          <label>
+            <span>Région</span>
+            <select id="region-filter"></select>
+          </label>
+          <label>
+            <span>Source</span>
+            <select id="source-filter"></select>
+          </label>
+          <label>
+            <span>Tri</span>
+            <select id="sort-filter">
+              <option value="newest">Plus récent</option>
+              <option value="romand">Focus romand</option>
+              <option value="calm">Plus calme</option>
+              <option value="alert">Plus tendu</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="slider-row">
+          <label class="slider">
+            <span>Tension max <strong id="tension-value">10</strong></span>
+            <input id="tension-filter" type="range" min="0" max="10" value="10" />
+          </label>
+          <label class="slider">
+            <span>Focus romand <strong id="priority-value">0</strong></span>
+            <input id="priority-filter" type="range" min="0" max="140" step="10" value="0" />
+          </label>
+          <label class="toggle">
+            <input id="child-filter" type="checkbox" />
+            <span>Adapté enfants</span>
+          </label>
+          <label class="toggle">
+            <input id="sports-filter" type="checkbox" checked />
+            <span>Masquer sport</span>
+          </label>
+          <label class="toggle">
+            <input id="read-filter" type="checkbox" checked />
+            <span>Masquer lus</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="news-head">
+        <div>
+          <p class="eyebrow">News scrappées</p>
+          <h2 id="result-title">Actualités</h2>
+        </div>
+        <button id="reset-filters" type="button">Réinitialiser</button>
+      </section>
+
+      <section class="news-list" id="news-list" aria-live="polite"></section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

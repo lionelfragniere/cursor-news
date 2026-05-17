@@ -1,0 +1,276 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2;
+  --ink: #191c1f;
+  --muted: #68707a;
+  --line: #d9d6cf;
+  --panel: #ffffff;
+  --accent: #0f766e;
+  --accent-2: #a13418;
+  --warn: #9a6700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+.shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.topbar,
+.now-header,
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.now-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar {
+  min-height: 72px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 32px;
+}
+
+h2 {
+  font-size: 20px;
+}
+
+.status-pill,
+.slot {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #eef7f5;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.live-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.live-button:hover {
+  background: var(--accent);
+}
+
+.live-link {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 700;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.live-link:hover {
+  color: var(--accent);
+}
+
+.now,
+.live-stream,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.now,
+.live-stream {
+  margin-top: 24px;
+  padding: 22px;
+}
+
+.live-stream {
+  margin-top: 18px;
+}
+
+audio {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.summary {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.transcript {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 18px;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.transcript p {
+  margin: 0 0 14px;
+  max-width: 78ch;
+}
+
+.transcript p:last-child {
+  margin-bottom: 0;
+}
+
+.transcript .source-credit {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.sources a {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--ink);
+  text-decoration: none;
+  background: #fbfaf7;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.history {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.archive-panel {
+  grid-column: 1 / -1;
+}
+
+.archive {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-top: 14px;
+}
+
+.history-item {
+  width: 100%;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.archive-item {
+  border-top: 1px solid var(--line);
+  color: inherit;
+  min-width: 0;
+  padding-top: 10px;
+  text-decoration: none;
+}
+
+.history-item:hover,
+.history-item.active,
+.archive-item:hover {
+  color: var(--accent);
+}
+
+.history-title,
+.archive-title {
+  font-weight: 700;
+}
+
+.history-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 14px;
+  margin: 14px 0 0;
+}
+
+.metrics dt {
+  color: var(--muted);
+}
+
+.metrics dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .topbar,
+  .now-header,
+  .now-actions,
+  .history-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100% - 20px, 1180px);
+    padding-top: 14px;
+  }
+}

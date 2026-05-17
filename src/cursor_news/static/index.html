@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursor News</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Web-radio locale</p>
+          <h1>Cursor News</h1>
+        </div>
+        <div class="status-pill" id="pipeline-status">Connexion...</div>
+      </header>
+
+      <section class="now">
+        <div class="now-header">
+          <div>
+            <p class="eyebrow" id="playback-mode">Direct</p>
+            <h2 id="current-title">En attente du premier bulletin</h2>
+          </div>
+          <div class="now-actions">
+            <button class="live-button" id="live-button" type="button" hidden>Revenir au direct</button>
+            <div class="slot" id="current-slot">--:--</div>
+          </div>
+        </div>
+        <audio id="player" controls preload="metadata"></audio>
+        <p class="summary" id="current-summary">Le pipeline local n'a pas encore publié d'audio prêt.</p>
+        <article class="transcript" id="current-transcript"></article>
+        <div class="sources" id="current-sources"></div>
+      </section>
+
+      <section class="live-stream" id="infomaniak-live" hidden>
+        <div class="now-header">
+          <div>
+            <p class="eyebrow">Infomaniak</p>
+            <h2>Direct public</h2>
+          </div>
+          <a class="live-link" id="stream-link" href="#" target="_blank" rel="noreferrer">Ouvrir</a>
+        </div>
+        <audio id="stream-player" controls preload="none"></audio>
+        <p class="summary" id="stream-status">Direct indisponible.</p>
+      </section>
+
+      <section class="grid">
+        <div class="panel">
+          <h2>Bulletins et tons</h2>
+          <div class="history" id="history"></div>
+        </div>
+        <div class="panel">
+          <h2>Pipeline</h2>
+          <dl class="metrics" id="metrics"></dl>
+        </div>
+        <div class="panel archive-panel">
+          <h2>Archives news</h2>
+          <div class="archive" id="article-archive"></div>
+        </div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+    <script src="/static/app.js?v=20260517-infomaniak-live"></script>
+  </body>
+</html>

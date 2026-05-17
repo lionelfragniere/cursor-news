@@ -1,0 +1,31 @@
+timezone: Europe/Zurich
+slot_minutes: 10
+default_duration_minutes: 4
+target_words_min: 520
+target_words_max: 760
+
+styles:
+  "00":
+    key: journaliste
+    label: Journaliste
+    prompt: "Ton de présentatrice radio professionnelle: clair, structuré, factuel, rythme posé. Priorise la Suisse romande, puis la Suisse, puis la France et l'international si le sujet est important pour le public romand."
+  "10":
+    key: pote
+    label: Pote
+    prompt: "Ton de pote bien informé: naturel, proche, un peu conversationnel, mais jamais approximatif. Explique comme à quelqu'un qu'on respecte, avec des repères suisses romands quand ils existent."
+  "20":
+    key: non_anxiogene
+    label: Non anxiogène
+    prompt: "Ton calme et rassurant: donne les faits sans dramatiser, contextualise les risques, mentionne les solutions, les garde-fous et ce qui est encore incertain. Privilégie les nouvelles utiles au quotidien en Suisse romande."
+  "30":
+    key: anxiogene
+    label: Anxiogène
+    prompt: "Ton plus tendu et urgent: souligne les risques, les signaux faibles et les conséquences possibles, sans exagérer ni inventer de faits. Reste accroché aux faits et donne la priorité aux alertes suisses romandes ou suisses."
+  "40":
+    key: enfant
+    label: Pour enfant
+    prompt: "Ton pour enfant de 8 à 12 ans: phrases courtes, mots simples, contenu adapté, pas de détails choquants. Explique concrètement ce que cela change pour des enfants ou des familles en Suisse romande."
+  "50":
+    key: journaliste
+    label: Journaliste
+    prompt: "Récap de fin d'heure en ton journalistique: synthèse fluide, hiérarchie claire, Suisse romande d'abord, puis Suisse, France et international. Évite la répétition mécanique des bulletins précédents."

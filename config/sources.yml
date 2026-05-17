@@ -1,0 +1,55 @@
+defaults:
+  interval_minutes: 5
+  max_entries: 0
+  enabled: true
+
+sources:
+  - name: RTN - Région
+    url: https://www.rtn.ch/documents.rdf?cid=9670&idz=33
+    region: suisse-romande
+    priority: 140
+
+  - name: RJB - Région
+    url: https://www.rjb.ch/documents.rdf?cid=9670&idz=33
+    region: suisse-romande
+    priority: 138
+
+  - name: RFJ - Région
+    url: https://www.rfj.ch/documents.rdf?cid=9670&idz=33
+    region: suisse-romande
+    priority: 136
+
+  - name: Le Temps - Actualités
+    url: https://www.letemps.ch/articles.rss
+    region: suisse-romande
+    priority: 130
+
+  - name: État de Fribourg
+    url: https://www.fr.ch/rss.xml
+    region: suisse-romande
+    priority: 118
+
+  - name: Franceinfo - Titres
+    url: https://www.franceinfo.fr/titres.rss
+    region: france
+    priority: 78
+
+  - name: Le Monde - En continu
+    url: https://www.lemonde.fr/rss/en_continu.xml
+    region: france
+    priority: 72
+
+  - name: France 24 - Français
+    url: https://www.france24.com/fr/rss
+    region: international
+    priority: 65
+
+  - name: RFI - Français
+    url: https://www.rfi.fr/fr/rss
+    region: international
+    priority: 60
+
+  - name: Euronews - Français
+    url: https://fr.euronews.com/rss?level=theme&name=news
+    region: europe
+    priority: 55
