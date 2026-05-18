@@ -64,6 +64,7 @@ def main(argv: list[str] | None = None) -> None:
     tick.add_argument("--skip-generate", action="store_true")
     tick.add_argument("--publish-gcp", action="store_true")
     tick.add_argument("--news-limit", type=int, default=500)
+    tick.add_argument("--strict", action="store_true", help="Arrete le tick a la premiere erreur.")
 
     sub.add_parser("status")
 
@@ -152,13 +153,40 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "tick":
         result: dict[str, object] = {}
+        errors: list[str] = []
         if not args.skip_ingest:
-            result["ingest"] = pipeline.ingest_once()
+            try:
+                result["ingest"] = pipeline.ingest_once()
+            except Exception as exc:
+                result["ingest_error"] = str(exc)
+                errors.append(f"ingest: {exc}")
+                if args.strict:
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
+                    raise
         if not args.skip_generate:
-            result["generated"] = pipeline.generate_buffer()
+            try:
+                result["generated"] = pipeline.generate_buffer()
+            except Exception as exc:
+                result["generate_error"] = str(exc)
+                errors.append(f"generate: {exc}")
+                if args.strict:
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
+                    raise
         if args.publish_gcp:
-            result["publish_gcp"] = publish_to_gcp(settings, news_limit=args.news_limit)
+            try:
+                result["publish_gcp"] = publish_to_gcp(settings, news_limit=args.news_limit)
+            except Exception as exc:
+                result["publish_gcp_error"] = str(exc)
+                errors.append(f"publish_gcp: {exc}")
+                if args.strict:
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
+                    raise
+        result["status"] = "error" if errors else "ok"
+        if errors:
+            result["errors"] = errors
         print(json.dumps(result, indent=2, ensure_ascii=False))
+        if errors:
+            raise SystemExit(1)
         return
 
     if args.command == "status":
