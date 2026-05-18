@@ -1,6 +1,7 @@
 const READ_STORAGE_KEY = "cursor-news-read-articles-v1";
 const ACCESS_STORAGE_KEY = "cursor-news-accessibility-v1";
 const GCP_DATA_BASE_URL = "https://storage.googleapis.com/cursor-news-radio-20260517-audio/current";
+const APP_TIME_ZONE = "Europe/Zurich";
 
 const state = {
   articles: [],
@@ -13,6 +14,7 @@ const state = {
   filters: {
     query: "",
     region: "all",
+    dateRange: "today",
     source: "all",
     sort: "newest",
     tension: 10,
@@ -34,6 +36,7 @@ const els = {
   contrast: document.querySelector("#contrast-toggle"),
   search: document.querySelector("#search"),
   region: document.querySelector("#region-filter"),
+  date: document.querySelector("#date-filter"),
   source: document.querySelector("#source-filter"),
   sort: document.querySelector("#sort-filter"),
   tension: document.querySelector("#tension-filter"),
@@ -140,6 +143,7 @@ function setupFilters(payload) {
   const listeners = [
     [els.search, "input"],
     [els.region, "change"],
+    [els.date, "change"],
     [els.source, "change"],
     [els.sort, "change"],
     [els.tension, "input"],
@@ -156,6 +160,7 @@ function updateFromControls() {
   state.filters = {
     query: els.search.value.trim(),
     region: els.region.value,
+    dateRange: els.date.value,
     source: els.source.value,
     sort: els.sort.value,
     tension: Number(els.tension.value),
@@ -172,6 +177,7 @@ function updateFromControls() {
 function resetFilters() {
   els.search.value = "";
   els.region.value = "all";
+  els.date.value = "today";
   els.source.value = "all";
   els.sort.value = "newest";
   els.tension.value = "10";
@@ -186,6 +192,7 @@ function filteredArticles() {
   const query = normalize(state.filters.query);
   const filtered = state.articles.filter((article) => {
     if (state.filters.region !== "all" && article.region !== state.filters.region) return false;
+    if (!matchesDateRange(article)) return false;
     if (state.filters.source !== "all" && article.source_name !== state.filters.source) return false;
     if (state.filters.hideSports && article.is_sports) return false;
     if (state.filters.hideRead && isRead(article)) return false;
@@ -215,9 +222,47 @@ function dateValue(article) {
   return new Date(article.published_at || article.scraped_at || 0).getTime();
 }
 
+function articleDate(article) {
+  const value = article.published_at || article.scraped_at;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function currentReferenceDate() {
+  const date = state.generatedAt ? new Date(state.generatedAt) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function zonedDateKey(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function matchesDateRange(article) {
+  if (state.filters.dateRange === "all") return true;
+  const date = articleDate(article);
+  if (!date) return false;
+  const reference = currentReferenceDate();
+  if (state.filters.dateRange === "today") {
+    return zonedDateKey(date) === zonedDateKey(reference);
+  }
+  if (state.filters.dateRange === "24h") {
+    return date.getTime() >= reference.getTime() - 24 * 60 * 60 * 1000;
+  }
+  if (state.filters.dateRange === "7d") {
+    return date.getTime() >= reference.getTime() - 7 * 24 * 60 * 60 * 1000;
+  }
+  return true;
+}
+
 function render() {
   const items = filteredArticles();
-  els.title.textContent = `${items.length} actualité${items.length > 1 ? "s" : ""}`;
+  els.title.textContent = `${items.length} actualité${items.length > 1 ? "s" : ""} - ${dateRangeLabel()}`;
   updateStatus();
   if (!items.length) {
     els.list.replaceChildren(emptyState());
@@ -288,8 +333,15 @@ function tag(text, className = "") {
 function emptyState() {
   const div = document.createElement("div");
   div.className = "empty";
-  div.textContent = "Aucune actualité ne correspond aux filtres.";
+  div.textContent = "Aucune actualité ne correspond aux filtres. Essaie une autre période ou allège les filtres.";
   return div;
+}
+
+function dateRangeLabel() {
+  if (state.filters.dateRange === "today") return "aujourd'hui";
+  if (state.filters.dateRange === "24h") return "24 dernières heures";
+  if (state.filters.dateRange === "7d") return "7 derniers jours";
+  return "tout l'historique";
 }
 
 function renderManifest(manifest) {
