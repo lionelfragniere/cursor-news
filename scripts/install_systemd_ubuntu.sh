@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_DIR="$HOME/.config/systemd/user"
 mkdir -p "$SYSTEMD_DIR"
 
+SYSTEMD_ROOT_DIR="${ROOT_DIR//\\/\\\\}"
+SYSTEMD_ROOT_DIR="${SYSTEMD_ROOT_DIR//\"/\\\"}"
+
 cat > "$SYSTEMD_DIR/cursor-news-tick.service" <<EOF
 [Unit]
 Description=Cursor News pipeline tick
@@ -12,8 +15,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=$ROOT_DIR
-ExecStart=/usr/bin/env bash $ROOT_DIR/scripts/run_tick_ubuntu.sh
+WorkingDirectory="$SYSTEMD_ROOT_DIR"
+ExecStart=/usr/bin/env bash "$SYSTEMD_ROOT_DIR/scripts/run_tick_ubuntu.sh"
 TimeoutStartSec=1800
 Nice=5
 IOSchedulingClass=best-effort
