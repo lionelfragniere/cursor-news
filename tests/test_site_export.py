@@ -34,3 +34,30 @@ def test_export_site_news_writes_filter_metadata(tmp_path: Path, monkeypatch):
     assert payload["articles"][0]["source_name"] == "RTN - Région"
     assert payload["articles"][0]["child_friendly"] is True
     assert "tension" in payload["articles"][0]
+
+
+def test_export_site_news_deduplicates_same_story_across_sources(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    settings = load_settings()
+    db = Database(settings.database_path)
+    db.init()
+    for name, priority in [("RTN - Région", 140), ("RJB - Région", 138), ("RFJ - Région", 136)]:
+        db.upsert_source(FeedSource(name=name, url=f"https://example.test/{priority}/rss", region="suisse-romande", priority=priority))
+        db.upsert_article(
+            ArticleInput(
+                source_name=name,
+                title="Slamer en forêt pour mieux admirer la nature",
+                url=f"https://example.test/{priority}/nature",
+                published_at="2026-05-18T16:00:00+02:00",
+                summary="La Fête de la nature démarre ce mercredi un peu partout en Suisse romande.",
+                content="",
+            )
+        )
+
+    output = tmp_path / "site" / "news.json"
+    payload = export_site_news(settings, output, limit=20)
+
+    assert payload["count"] == 1
+    assert payload["articles"][0]["source_name"] == "RTN - Région"

@@ -41,8 +41,8 @@ class Article:
     def prompt_text(self) -> str:
         body = self.content or self.summary
         body = " ".join(body.split())
-        if len(body) > 1200:
-            body = body[:1200].rsplit(" ", 1)[0] + "..."
+        if len(body) > 800:
+            body = body[:800].rsplit(" ", 1)[0] + "..."
         return f"- Source: {self.source_name}\n  Titre: {self.title}\n  URL: {self.url}\n  Date: {self.published_at or 'inconnue'}\n  Contenu: {body}"
 
 

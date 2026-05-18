@@ -17,4 +17,4 @@ def test_schedule_uses_explicit_ten_minute_grid():
         schedule.style_for(datetime.fromisoformat(f"2026-05-17T09:{minute:02d}:00+02:00")).key
         for minute in (0, 10, 20, 30, 40, 50)
     ]
-    assert keys == ["journaliste", "pote", "non_anxiogene", "anxiogene", "enfant", "journaliste"]
+    assert keys == ["journaliste", "pote", "non_anxiogene", "anxiogene", "enfant", "contexte"]

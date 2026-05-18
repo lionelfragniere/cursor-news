@@ -1,8 +1,8 @@
 timezone: Europe/Zurich
 slot_minutes: 10
-default_duration_minutes: 4
-target_words_min: 520
-target_words_max: 760
+default_duration_minutes: 8
+target_words_min: 980
+target_words_max: 1240
 
 styles:
   "00":
@@ -26,6 +26,6 @@ styles:
     label: Pour enfant
     prompt: "Ton pour enfant de 8 à 12 ans: phrases courtes, mots simples, contenu adapté, pas de détails choquants. Explique concrètement ce que cela change pour des enfants ou des familles en Suisse romande."
   "50":
-    key: journaliste
-    label: Journaliste
-    prompt: "Récap de fin d'heure en ton journalistique: synthèse fluide, hiérarchie claire, Suisse romande d'abord, puis Suisse, France et international. Évite la répétition mécanique des bulletins précédents."
+    key: contexte
+    label: Contexte / à suivre
+    prompt: "Ton de fin d'heure analytique et utile: donne du recul, relie les sujets entre eux, explique pourquoi ils comptent pour la Suisse romande, et termine par ce qu'il faudra surveiller dans les prochaines heures. Ne fais pas un simple récapitulatif."

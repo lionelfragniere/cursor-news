@@ -56,6 +56,46 @@ def test_pipeline_article_selection_skips_sports(tmp_path: Path, monkeypatch):
     assert [article.title for article in selected] == ["Une réforme de la santé est présentée"]
 
 
+def test_pipeline_article_selection_deduplicates_same_story(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    for name, priority in [("RTN - Région", 140), ("RJB - Région", 138), ("RFJ - Région", 136)]:
+        pipeline.db.upsert_source(FeedSource(name=name, url=f"https://example.test/{priority}/rss", priority=priority))
+        pipeline.db.upsert_article(
+            ArticleInput(
+                source_name=name,
+                title="Slamer en forêt pour mieux admirer la nature",
+                url=f"https://example.test/{priority}/nature",
+                published_at="2026-05-18T16:00:00+02:00",
+                summary="La Fête de la nature démarre ce mercredi un peu partout en Suisse romande.",
+                content="",
+            )
+        )
+    pipeline.db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss", priority=100))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Fixture",
+            title="Un nouveau train est annoncé dans le Jura",
+            url="https://example.test/train",
+            published_at="2026-05-18T15:00:00+02:00",
+            summary="Une nouvelle liaison est présentée.",
+            content="",
+        )
+    )
+
+    selected = pipeline._select_articles()
+
+    assert [article.title for article in selected] == [
+        "Slamer en forêt pour mieux admirer la nature",
+        "Un nouveau train est annoncé dans le Jura",
+    ]
+
+
 def test_pipeline_child_selection_skips_adult_topics(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
     monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))

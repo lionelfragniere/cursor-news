@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .article_filter import anxiety_score, calm_score, is_child_unsuitable_article
+from .article_filter import anxiety_score, calm_score, is_child_unsuitable_article, story_key
 from .database import Database
 from .models import Article
 from .settings import Settings
@@ -50,10 +50,11 @@ def _export_articles(db: Database, limit: int, include_sports: bool) -> list[dic
             ORDER BY COALESCE(a.published_at, a.created_at) DESC, s.priority DESC
             LIMIT ?
             """,
-            (limit,),
+            (limit * 3,),
         ).fetchall()
 
     items: list[dict] = []
+    seen_stories: set[str] = set()
     for row in rows:
         article = Article(
             id=int(row["id"]),
@@ -65,6 +66,10 @@ def _export_articles(db: Database, limit: int, include_sports: bool) -> list[dic
             content=str(row["content"] or ""),
             priority=int(row["priority"]),
         )
+        key = story_key(article)
+        if key in seen_stories:
+            continue
+        seen_stories.add(key)
         tension = min(10, anxiety_score(article))
         calm = min(10, calm_score(article))
         child_unsuitable = is_child_unsuitable_article(article)
@@ -88,6 +93,8 @@ def _export_articles(db: Database, limit: int, include_sports: bool) -> list[dic
                 "child_friendly": not child_unsuitable and not bool(row["is_sports"]),
             }
         )
+        if len(items) >= limit:
+            break
     return items
 
 

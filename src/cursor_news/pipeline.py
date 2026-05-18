@@ -9,6 +9,7 @@ from .article_filter import (
     filter_child_unsuitable_articles,
     filter_sports_articles,
     rank_articles_for_style,
+    unique_articles_by_story,
     unique_articles_by_topic,
 )
 from .audio import AudioEncoder
@@ -93,6 +94,7 @@ class CursorNewsPipeline:
             selected = [*selected, *recent]
         ranking_style = "non_anxiogene" if style_key == "enfant" else style_key
         selected = rank_articles_for_style(selected, ranking_style)
+        selected = unique_articles_by_story(selected)
         selected = unique_articles_by_topic(selected) if style_key == "enfant" else diversify_articles_by_topic(selected)
         return selected[: self.settings.max_articles]
 
@@ -205,10 +207,10 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
         "cette information concerne des décisions prises",
         "il y a une situation à comprendre",
     )
-    if word_count < 430:
-        return f"LLM returned a short transcript ({word_count} words)"
     if "trop court" in warning_text or "too short" in warning_text:
         return "LLM self-reported a short transcript"
+    if word_count < 820:
+        return f"LLM returned a short transcript ({word_count} words)"
     for phrase in generic_child_phrases:
         if phrase in transcript:
             return f"LLM returned generic radio filler: {phrase}"

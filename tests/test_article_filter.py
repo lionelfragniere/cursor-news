@@ -6,6 +6,8 @@ from cursor_news.article_filter import (
     is_child_unsuitable_article,
     is_sports_article,
     rank_articles_for_style,
+    story_key,
+    unique_articles_by_story,
     unique_articles_by_topic,
 )
 from cursor_news.models import Article
@@ -17,6 +19,18 @@ def article(title: str, summary: str = "") -> Article:
         source_name="Fixture",
         title=title,
         url="https://example.test",
+        published_at=None,
+        summary=summary,
+        content="",
+    )
+
+
+def sourced_article(title: str, source: str, summary: str = "") -> Article:
+    return Article(
+        id=1,
+        source_name=source,
+        title=title,
+        url=f"https://example.test/{source}",
         published_at=None,
         summary=summary,
         content="",
@@ -107,3 +121,20 @@ def test_unique_articles_by_topic_drops_repeated_topics():
     samsung = article("En Corée du Sud, une grève chez Samsung")
 
     assert unique_articles_by_topic([eurovision_1, eurovision_2, samsung]) == [eurovision_1, samsung]
+
+
+def test_unique_articles_by_story_drops_same_title_from_regional_network():
+    rtn = sourced_article(
+        "Slamer en forêt pour mieux admirer la nature",
+        "RTN - Région",
+        "La Fête de la nature démarre ce mercredi en Suisse romande.",
+    )
+    rjb = sourced_article(
+        "Slamer en forêt pour mieux admirer la nature",
+        "RJB - Région",
+        "La Fête de la nature démarre ce mercredi en Suisse romande.",
+    )
+    other = sourced_article("Un nouveau train est annoncé dans le Jura", "RFJ - Région")
+
+    assert story_key(rtn) == story_key(rjb)
+    assert unique_articles_by_story([rtn, rjb, other]) == [rtn, other]

@@ -237,6 +237,26 @@ def unique_articles_by_topic(articles: list[Article]) -> list[Article]:
     return unique
 
 
+def unique_articles_by_story(articles: list[Article]) -> list[Article]:
+    unique: list[Article] = []
+    seen: set[str] = set()
+    for article in articles:
+        key = story_key(article)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(article)
+    return unique
+
+
+def story_key(article: Article) -> str:
+    title = _normalize_for_key(article.title)
+    if len(title) >= 12:
+        return f"title:{title}"
+    summary = _normalize_for_key(article.summary or article.content)
+    return f"body:{title}:{summary[:140]}"
+
+
 def topic_key(article: Article) -> str:
     text = _normalize(" ".join([article.title, article.summary, article.content]))
     known_topics = (
@@ -285,3 +305,11 @@ def _normalize(text: str) -> str:
     text = unicodedata.normalize("NFKD", text)
     text = "".join(char for char in text if not unicodedata.combining(char))
     return text
+
+
+def _normalize_for_key(text: str) -> str:
+    text = _normalize(text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()

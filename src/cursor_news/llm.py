@@ -151,9 +151,9 @@ Style: {style.label}
 Consigne de ton: {style.prompt}
 
 Objectif:
-- Écrire un bulletin radio de 3 à 5 minutes, environ 520 à 760 mots.
-- Construire 8 à 10 sujets courts si assez d'articles sont disponibles.
-- Développer chaque sujet en 55 à 80 mots pour éviter un bulletin trop court.
+- Écrire un bulletin radio d'environ 8 minutes, environ 980 à 1240 mots.
+- Construire 10 à 14 sujets courts si assez d'articles sont disponibles.
+- Développer chaque sujet en 70 à 100 mots pour éviter un bulletin trop court.
 - Ne pas inventer de faits absents des sources.
 - Ne pas citer les sources au milieu des sujets: pas de "selon Franceinfo", pas de "source:", pas de nom de média dans chaque transition.
 - Regrouper les crédits de sources uniquement dans la toute dernière phrase, sous la forme: "Sources utilisées pour cette édition: ...".
@@ -168,6 +168,7 @@ Objectif:
 - Si le style est "Pour enfant", adapter le contenu lui-même: phrases courtes, mots simples, contexte clair, pas de détails violents ou de chiffres anxiogènes en série, et expliquer les sujets compliqués sans infantiliser.
 - Pour le style "Pour enfant", ne remplace jamais un sujet concret par une catégorie vague: il faut nommer le lieu, la personne, l'événement ou l'institution quand ils sont dans l'article.
 - Pour le style "Pour enfant", bannis les phrases génériques comme "une nouvelle arrive du monde de la culture", "des responsables politiques prennent des décisions" ou "il y a une situation à comprendre".
+- Pour le style "Contexte / à suivre", ne répète pas simplement les titres: explique les liens, les conséquences possibles, les angles morts et les points à vérifier ensuite.
 
 Articles disponibles:
 {article_block}
@@ -220,6 +221,8 @@ def _template_opener(style: StyleSlot) -> str:
             return "Édition spéciale Cursor News. Le rythme est plus tendu ce soir: on suit les signaux d'alerte, les risques possibles et les conséquences concrètes, sans sortir des faits établis."
         case "enfant":
             return "Bonjour, tu écoutes Cursor News. On reprend les grandes nouvelles avec des mots simples, pour comprendre ce qui se passe sans se perdre dans les détails compliqués."
+        case "contexte":
+            return "Bonjour, vous écoutez Cursor News. Dans cette édition de fin d'heure, on prend un peu de recul: ce qui vient de se passer, ce que cela change, et ce qu'il faudra suivre ensuite."
         case _:
             return "Bonjour, vous écoutez Cursor News. Voici les principales actualités francophones et internationales, avec un point clair sur les faits et leurs conséquences."
 
@@ -245,6 +248,12 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
             )
         case "enfant":
             return _template_child_segment(index, title, source, text)
+        case "contexte":
+            return (
+                f"{transition}, {title}. "
+                f"{_sentence(excerpt)} "
+                "À suivre maintenant: les réactions, les décisions concrètes et les effets possibles pour le public romand."
+            )
         case _:
             return (
                 f"{transition}, {title}. "
@@ -262,6 +271,8 @@ def _template_closer(style: StyleSlot) -> str:
             return "Fin de cette édition sous tension. Les signaux restent à surveiller, et Cursor News revient dès que de nouveaux éléments solides apparaissent."
         case "enfant":
             return "C'est la fin de ce bulletin. On se retrouve au prochain rendez-vous Cursor News."
+        case "contexte":
+            return "Fin de ce point de contexte. Cursor News garde ces dossiers ouverts et revient au prochain créneau avec les éléments nouveaux, confirmés et utiles."
         case _:
             return "C'était Cursor News. Merci pour votre écoute, et rendez-vous dans quelques minutes pour la prochaine édition."
 
