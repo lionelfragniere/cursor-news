@@ -3,10 +3,18 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_DIR="$HOME/.config/systemd/user"
+RUNNER_DIR="$HOME/.local/bin"
+RUNNER_PATH="$RUNNER_DIR/cursor-news-tick-runner"
 mkdir -p "$SYSTEMD_DIR"
+mkdir -p "$RUNNER_DIR"
 
-SYSTEMD_ROOT_DIR="${ROOT_DIR//\\/\\\\}"
-SYSTEMD_ROOT_DIR="${SYSTEMD_ROOT_DIR//\"/\\\"}"
+cat > "$RUNNER_PATH" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$ROOT_DIR"
+exec bash "$ROOT_DIR/scripts/run_tick_ubuntu.sh"
+EOF
+chmod +x "$RUNNER_PATH"
 
 cat > "$SYSTEMD_DIR/cursor-news-tick.service" <<EOF
 [Unit]
@@ -15,8 +23,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory="$SYSTEMD_ROOT_DIR"
-ExecStart=/usr/bin/env bash "$SYSTEMD_ROOT_DIR/scripts/run_tick_ubuntu.sh"
+ExecStart=$RUNNER_PATH
 TimeoutStartSec=1800
 Nice=5
 IOSchedulingClass=best-effort
@@ -38,6 +45,7 @@ Unit=cursor-news-tick.service
 WantedBy=timers.target
 EOF
 
+systemctl --user reset-failed cursor-news-tick.service cursor-news-tick.timer >/dev/null 2>&1 || true
 systemctl --user daemon-reload
 systemctl --user enable --now cursor-news-tick.timer
 
