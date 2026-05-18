@@ -26,7 +26,8 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
-    manifest = build_manifest(current, public_base_url)
+    bulletins_by_style = latest_bulletins_by_style(db.bulletin_history(limit=60))
+    manifest = build_manifest(current, public_base_url, bulletins_by_style)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
     messages = [
@@ -71,6 +72,20 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
                     cache_control="public, max-age=31536000, immutable",
                 )
             )
+    for bulletin in bulletins_by_style:
+        audio_path = Path(str(bulletin.get("audio_path") or ""))
+        if not audio_path.exists():
+            continue
+        messages.append(
+            _gcloud_cp(
+                gcloud,
+                audio_path,
+                f"{bucket.rstrip('/')}/bulletins/{bulletin['id']}.mp3",
+                project=project,
+                content_type="audio/mpeg",
+                cache_control="public, max-age=31536000, immutable",
+            )
+        )
     messages.append(f"published {news_payload['count']} news to {public_base_url}")
     return messages
 
@@ -100,24 +115,55 @@ def configure_gcp_bucket_cors(settings: Settings) -> list[str]:
     return [f"configured CORS on {bucket}"]
 
 
-def build_manifest(current: dict | None, public_base_url: str) -> dict:
+def latest_bulletins_by_style(history: list[dict], limit: int = 6) -> list[dict]:
+    selected: list[dict] = []
+    seen: set[str] = set()
+    for item in history:
+        style_key = str(item.get("style_key") or item.get("style_label") or "")
+        if not style_key or style_key in seen:
+            continue
+        if not item.get("audio_path"):
+            continue
+        selected.append(item)
+        seen.add(style_key)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def build_manifest(current: dict | None, public_base_url: str, bulletins_by_style: list[dict] | None = None) -> dict:
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    bulletins = [
+        _manifest_bulletin_item(item, public_base_url)
+        for item in (bulletins_by_style or [])
+    ]
     if not current:
-        return {"generated_at": generated_at, "current": None}
+        return {"generated_at": generated_at, "current": None, "bulletins_by_style": bulletins}
     return {
         "generated_at": generated_at,
-        "current": {
-            "id": current["id"],
-            "slot_start": current["slot_start"],
-            "style": current["style_label"],
-            "title": current["title"],
-            "summary": current.get("summary", ""),
-            "transcript": current.get("transcript", ""),
-            "duration_seconds": current.get("duration_seconds"),
-            "audio_url": f"{public_base_url.rstrip('/')}/current/live.mp3",
-            "archive_audio_url": f"{public_base_url.rstrip('/')}/bulletins/{current['id']}.mp3",
-            "sources": current.get("sources", []),
-        },
+        "current": _manifest_bulletin_item(current, public_base_url, current_audio=True),
+        "bulletins_by_style": bulletins,
+    }
+
+
+def _manifest_bulletin_item(item: dict, public_base_url: str, current_audio: bool = False) -> dict:
+    audio_url = (
+        f"{public_base_url.rstrip('/')}/current/live.mp3"
+        if current_audio
+        else f"{public_base_url.rstrip('/')}/bulletins/{item['id']}.mp3"
+    )
+    return {
+        "id": item["id"],
+        "slot_start": item["slot_start"],
+        "style_key": item.get("style_key", ""),
+        "style": item["style_label"],
+        "title": item["title"],
+        "summary": item.get("summary", ""),
+        "transcript": item.get("transcript", ""),
+        "duration_seconds": item.get("duration_seconds"),
+        "audio_url": audio_url,
+        "archive_audio_url": f"{public_base_url.rstrip('/')}/bulletins/{item['id']}.mp3",
+        "sources": item.get("sources", []),
     }
 
 

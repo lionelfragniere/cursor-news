@@ -418,7 +418,7 @@ class Database:
         with self.connect() as con:
             rows = con.execute(
                 """
-                SELECT id, slot_start, style_label, title, summary, transcript, audio_path, audio_mime_type, duration_seconds, created_at
+                SELECT id, slot_start, style_key, style_label, title, summary, transcript, audio_path, audio_mime_type, duration_seconds, created_at
                 FROM bulletins
                 WHERE status = 'ready'
                 ORDER BY slot_start DESC

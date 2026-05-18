@@ -32,6 +32,7 @@ const els = {
   bulletinSummary: document.querySelector("#bulletin-summary"),
   bulletinTranscript: document.querySelector("#bulletin-transcript"),
   bulletinAudioLink: document.querySelector("#bulletin-audio-link"),
+  bulletinGrid: document.querySelector("#bulletin-grid"),
   textSize: document.querySelector("#text-size-toggle"),
   contrast: document.querySelector("#contrast-toggle"),
   search: document.querySelector("#search"),
@@ -345,6 +346,7 @@ function dateRangeLabel() {
 
 function renderManifest(manifest) {
   const current = manifest?.current;
+  renderBulletinGrid(manifest?.bulletins_by_style || []);
   if (!current) {
     els.bulletinTitle.textContent = "Aucun bulletin publié";
     els.bulletinSummary.textContent = "";
@@ -369,6 +371,54 @@ function renderManifest(manifest) {
       return paragraph;
     }),
   );
+}
+
+function renderBulletinGrid(items) {
+  if (!els.bulletinGrid) return;
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Les bulletins par ton apparaîtront après les prochains cycles de génération.";
+    els.bulletinGrid.replaceChildren(empty);
+    return;
+  }
+  els.bulletinGrid.replaceChildren(...items.map(renderBulletinCard));
+}
+
+function renderBulletinCard(item) {
+  const article = document.createElement("article");
+  article.className = "bulletin-card";
+
+  const label = document.createElement("div");
+  label.className = "tag";
+  label.textContent = item.style || "Bulletin";
+
+  const title = document.createElement("h3");
+  title.textContent = item.title || "Cursor News";
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const duration = item.duration_seconds ? ` · ${Math.round(item.duration_seconds / 60)} min` : "";
+  meta.textContent = `${formatDate(item.slot_start)}${duration}`;
+
+  const audio = document.createElement("audio");
+  audio.controls = true;
+  audio.preload = "metadata";
+  audio.src = `${item.archive_audio_url || item.audio_url}?v=${encodeURIComponent(item.id || Date.now())}`;
+  audio.addEventListener("play", () => pauseOtherAudio(audio));
+
+  const summary = document.createElement("p");
+  summary.className = "summary";
+  summary.textContent = item.summary || "";
+
+  article.append(label, title, meta, audio, summary);
+  return article;
+}
+
+function pauseOtherAudio(active) {
+  document.querySelectorAll("audio").forEach((audio) => {
+    if (audio !== active) audio.pause();
+  });
 }
 
 function updateStatus() {

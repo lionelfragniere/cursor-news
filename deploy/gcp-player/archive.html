@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Archives - Cursor News</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell archive-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/logo.webp" alt="Cursor News" />
+          <div>
+            <p class="eyebrow">Archives</p>
+            <h1>Cursor News</h1>
+            <nav class="nav-links" aria-label="Navigation principale">
+              <a href="/">Direct</a>
+              <a href="/archive.html">Archives</a>
+            </nav>
+          </div>
+        </div>
+        <div class="status" id="archive-status">Chargement...</div>
+      </header>
+
+      <section class="filters archive-filters" aria-label="Recherche dans les archives">
+        <div class="search-row archive-search-row">
+          <label>
+            <span>Mot clé</span>
+            <input id="archive-search" type="search" placeholder="Sujet, lieu, source..." autofocus />
+          </label>
+          <label>
+            <span>Région</span>
+            <select id="archive-region"></select>
+          </label>
+          <label>
+            <span>Source</span>
+            <select id="archive-source"></select>
+          </label>
+          <label>
+            <span>Période</span>
+            <select id="archive-period">
+              <option value="all" selected>Tout l'historique</option>
+              <option value="today">Aujourd'hui</option>
+              <option value="24h">24 dernières heures</option>
+              <option value="7d">7 derniers jours</option>
+            </select>
+          </label>
+          <label>
+            <span>Tri</span>
+            <select id="archive-sort">
+              <option value="newest">Plus récent</option>
+              <option value="romand">Focus romand</option>
+              <option value="calm">Plus calme</option>
+              <option value="alert">Plus tendu</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="news-head">
+        <div>
+          <p class="eyebrow">Articles scrappés</p>
+          <h2 id="archive-title">Archives</h2>
+        </div>
+        <button id="archive-reset" type="button">Réinitialiser</button>
+      </section>
+
+      <section class="news-list" id="archive-list" aria-live="polite"></section>
+    </main>
+    <script src="/archive.js"></script>
+  </body>
+</html>
