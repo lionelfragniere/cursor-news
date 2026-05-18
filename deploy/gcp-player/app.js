@@ -14,7 +14,7 @@ const state = {
   filters: {
     query: "",
     region: "all",
-    dateRange: "today",
+    dateRange: "24h",
     source: "all",
     sort: "newest",
     tension: 10,
@@ -177,7 +177,7 @@ function updateFromControls() {
 function resetFilters() {
   els.search.value = "";
   els.region.value = "all";
-  els.date.value = "today";
+  els.date.value = "24h";
   els.source.value = "all";
   els.sort.value = "newest";
   els.tension.value = "10";
