@@ -230,8 +230,7 @@ function articleDate(article) {
 }
 
 function currentReferenceDate() {
-  const date = state.generatedAt ? new Date(state.generatedAt) : new Date();
-  return Number.isNaN(date.getTime()) ? new Date() : date;
+  return new Date();
 }
 
 function zonedDateKey(date) {
