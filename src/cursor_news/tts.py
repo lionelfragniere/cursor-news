@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Protocol
 import unicodedata
 
+from .executables import resolve_executable
+
 
 class TTSClient(Protocol):
     def synthesize_to_wav(self, text: str, output_path: Path) -> Path:
@@ -111,7 +113,7 @@ class EdgeTTSClient:
     def __init__(self, voice: str, rate: str, ffmpeg_path: str | None):
         self.voice = voice
         self.rate = rate
-        self.ffmpeg_path = ffmpeg_path or shutil.which("ffmpeg")
+        self.ffmpeg_path = resolve_executable(ffmpeg_path, "ffmpeg")
 
     def synthesize_to_wav(self, text: str, output_path: Path) -> Path:
         if not self.ffmpeg_path:

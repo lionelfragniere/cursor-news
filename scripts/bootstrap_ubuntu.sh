@@ -48,6 +48,18 @@ if [ ! -f ".env" ]; then
   echo ".env créé depuis .env.example. Vérifie les variables GCP_* avant le premier tick."
 fi
 
+if grep -Eq '^FFMPEG_PATH=.*\\.*ffmpeg\.exe' .env 2>/dev/null; then
+  cp .env ".env.backup.$(date +%Y%m%d%H%M%S)"
+  sed -i 's|^FFMPEG_PATH=.*|FFMPEG_PATH=|' .env
+  echo "FFMPEG_PATH Windows détecté dans .env; Ubuntu utilisera ffmpeg depuis le PATH."
+fi
+
+if grep -Eq '^GCLOUD_PATH=.*\.cmd' .env 2>/dev/null; then
+  cp .env ".env.backup.$(date +%Y%m%d%H%M%S)"
+  sed -i 's|^GCLOUD_PATH=.*|GCLOUD_PATH=gcloud|' .env
+  echo "GCLOUD_PATH Windows détecté dans .env; Ubuntu utilisera gcloud depuis le PATH."
+fi
+
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user daemon-reload >/dev/null 2>&1 || true
 fi

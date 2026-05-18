@@ -8,12 +8,13 @@ from pathlib import Path
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3, TIT2, TPE1
 
+from .executables import resolve_executable
 from .models import AudioResult
 
 
 class AudioEncoder:
     def __init__(self, ffmpeg_path: str | None, allow_wav_fallback: bool = False):
-        self.ffmpeg_path = ffmpeg_path or shutil.which("ffmpeg")
+        self.ffmpeg_path = resolve_executable(ffmpeg_path, "ffmpeg")
         self.allow_wav_fallback = allow_wav_fallback
 
     def encode_for_web(self, wav_path: Path, output_path: Path, title: str) -> AudioResult:

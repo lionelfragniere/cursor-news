@@ -73,6 +73,15 @@ EDGE_TTS_VOICE=fr-CH-ArianeNeural
 OLLAMA_MODEL=qwen3:14b
 ```
 
+Si `.env` vient directement de Windows, remplace aussi toute valeur du type `tools\ffmpeg\bin\ffmpeg.exe` par une valeur vide:
+
+```bash
+sed -i 's|^FFMPEG_PATH=.*|FFMPEG_PATH=|' .env
+sed -i 's|^GCLOUD_PATH=.*|GCLOUD_PATH=gcloud|' .env
+```
+
+Avec `FFMPEG_PATH=` l'application utilise automatiquement le `ffmpeg` installé par `apt`.
+
 ## 4. Installer les dépendances
 
 Depuis le dossier du projet:
@@ -171,4 +180,3 @@ Les prochaines améliorations utiles:
 - filtre "bonnes nouvelles / solutions";
 - version audio courte de chaque article;
 - clavier uniquement, avec focus visible partout.
-
