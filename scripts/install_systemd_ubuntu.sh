@@ -23,6 +23,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+Environment=CURSOR_NEWS_AUTO_GIT_PULL=1
 ExecStart=$RUNNER_PATH
 TimeoutStartSec=1800
 Nice=5
@@ -61,5 +62,10 @@ Commandes utiles:
   systemctl --user status cursor-news-tick.timer
   systemctl --user list-timers cursor-news-tick.timer
   journalctl --user -u cursor-news-tick.service -n 120 --no-pager
+
+Auto-update:
+  Le tick fait un git pull --ff-only avant chaque scrape si le repo est propre.
+  Pour le couper: systemctl --user edit cursor-news-tick.service
+  puis ajoute Environment=CURSOR_NEWS_AUTO_GIT_PULL=0 dans [Service].
 
 MSG
