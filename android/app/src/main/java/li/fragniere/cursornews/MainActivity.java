@@ -53,12 +53,26 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @SuppressWarnings("deprecation")
 public class MainActivity extends Activity {
     private static final String DATA_BASE = "https://storage.googleapis.com/cursor-news-radio-20260517-audio/current";
     private static final String PREFS = "cursor-news";
     private static final String READ_IDS = "read-ids";
+    private static final String PREF_QUERY = "filter-query";
+    private static final String PREF_PERIOD = "filter-period";
+    private static final String PREF_REGION = "filter-region";
+    private static final String PREF_SOURCE = "filter-source";
+    private static final String PREF_SORT = "filter-sort";
+    private static final String PREF_TENSION = "filter-tension";
+    private static final String PREF_PRIORITY = "filter-priority";
+    private static final String PREF_HIDE_READ = "filter-hide-read";
+    private static final String PREF_HIDE_SPORTS = "filter-hide-sports";
+    private static final String PREF_CHILD_ONLY = "filter-child-only";
+    private static final String PREF_INCLUDE_ENGLISH = "filter-include-english";
+    private static final String PREF_ADVANCED_OPEN = "filter-advanced-open";
 
     private boolean darkMode;
     private int bgColor;
@@ -96,6 +110,7 @@ public class MainActivity extends Activity {
     private CheckBox hideRead;
     private CheckBox hideSports;
     private CheckBox childOnly;
+    private CheckBox includeEnglish;
     private SeekBar tension;
     private SeekBar priority;
 
@@ -106,7 +121,12 @@ public class MainActivity extends Activity {
     private String sortFilter = "newest";
     private int maxTension = 10;
     private int minPriority = 0;
+    private boolean hideReadFilter = true;
+    private boolean hideSportsFilter = true;
+    private boolean childOnlyFilter = false;
+    private boolean includeEnglishFilter = false;
     private boolean advancedOpen = false;
+    private boolean restoringFilters = false;
     private String audioUrl = DATA_BASE + "/live.mp3";
     private MediaPlayer mediaPlayer;
     private boolean audioPreparing = false;
@@ -117,6 +137,7 @@ public class MainActivity extends Activity {
         applyThemeColors();
         configureSystemBars();
         readIds.addAll(getSharedPreferences(PREFS, MODE_PRIVATE).getStringSet(READ_IDS, new HashSet<>()));
+        loadFilterPreferences();
         buildUi();
         loadData();
     }
@@ -271,11 +292,12 @@ public class MainActivity extends Activity {
         search.setHint("Recherche: sujet, lieu, source...");
         search.setTextColor(inkColor);
         search.setHintTextColor(mutedColor);
+        search.setText(query);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 query = s.toString();
-                renderArticles();
+                filtersChanged();
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -291,8 +313,10 @@ public class MainActivity extends Activity {
         fillSpinner(region, "Toutes les régions");
         fillSpinner(source, "Toutes les sources");
         fillSpinner(sort, "Plus récent", "Focus romand", "Plus calme", "Plus tendu");
+        period.setSelection(periodIndex(periodFilter), false);
+        sort.setSelection(sortIndex(sortFilter), false);
 
-        hideRead = checkbox("Masquer lus", true);
+        hideRead = checkbox("Masquer lus", hideReadFilter);
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setGravity(Gravity.CENTER_VERTICAL);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -310,43 +334,49 @@ public class MainActivity extends Activity {
 
         period.setOnItemSelectedListener(listener(position -> {
             periodFilter = position == 1 ? "today" : position == 2 ? "7d" : position == 3 ? "all" : "24h";
-            renderArticles();
+            filtersChanged();
         }));
         region.setOnItemSelectedListener(listener(position -> {
             regionFilter = position <= 0 ? "all" : String.valueOf(region.getSelectedItem());
-            renderArticles();
+            filtersChanged();
         }));
         source.setOnItemSelectedListener(listener(position -> {
             sourceFilter = position <= 0 ? "all" : String.valueOf(source.getSelectedItem());
-            renderArticles();
+            filtersChanged();
         }));
         sort.setOnItemSelectedListener(listener(position -> {
             sortFilter = position == 1 ? "romand" : position == 2 ? "calm" : position == 3 ? "alert" : "newest";
-            renderArticles();
+            filtersChanged();
         }));
+        hideRead.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            hideReadFilter = isChecked;
+            filtersChanged();
+        });
 
         tensionValue = label("10", 13, Typeface.BOLD, accentColor);
         tension = new SeekBar(this);
         tension.setMax(10);
-        tension.setProgress(10);
+        tension.setProgress(maxTension);
+        tensionValue.setText(String.valueOf(maxTension));
         tension.setProgressTintList(ColorStateList.valueOf(accentColor));
         tension.setThumbTintList(ColorStateList.valueOf(accentColor));
         tension.setOnSeekBarChangeListener(seekListener(value -> {
             maxTension = value;
             tensionValue.setText(String.valueOf(value));
-            renderArticles();
+            filtersChanged();
         }));
 
         priorityValue = label("0", 13, Typeface.BOLD, accentColor);
         priority = new SeekBar(this);
         priority.setMax(14);
-        priority.setProgress(0);
+        priority.setProgress(Math.max(0, Math.min(14, minPriority / 10)));
+        priorityValue.setText(String.valueOf(minPriority));
         priority.setProgressTintList(ColorStateList.valueOf(accentColor));
         priority.setThumbTintList(ColorStateList.valueOf(accentColor));
         priority.setOnSeekBarChangeListener(seekListener(value -> {
             minPriority = value * 10;
             priorityValue.setText(String.valueOf(minPriority));
-            renderArticles();
+            filtersChanged();
         }));
 
         advancedFilters.addView(sliderField("Tension max", tensionValue, tension));
@@ -355,12 +385,28 @@ public class MainActivity extends Activity {
         LinearLayout toggles = new LinearLayout(this);
         toggles.setOrientation(LinearLayout.VERTICAL);
         toggles.setPadding(0, dp(4), 0, 0);
-        childOnly = checkbox("Adapté enfants", false);
-        hideSports = checkbox("Masquer sport", true);
+        childOnly = checkbox("Adapté enfants", childOnlyFilter);
+        hideSports = checkbox("Masquer sport", hideSportsFilter);
+        includeEnglish = checkbox("Inclure anglais", includeEnglishFilter);
+        childOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            childOnlyFilter = isChecked;
+            filtersChanged();
+        });
+        hideSports.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            hideSportsFilter = isChecked;
+            filtersChanged();
+        });
+        includeEnglish.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            includeEnglishFilter = isChecked;
+            filtersChanged();
+        });
         toggles.addView(childOnly);
         toggles.addView(hideSports);
+        toggles.addView(includeEnglish);
         advancedFilters.addView(toggles);
 
+        advancedFilters.setVisibility(advancedOpen ? View.VISIBLE : View.GONE);
+        advancedButton.setText(advancedOpen ? "Masquer les filtres" : "Filtres et recherche");
         return filters;
     }
 
@@ -368,6 +414,7 @@ public class MainActivity extends Activity {
         advancedOpen = !advancedOpen;
         advancedFilters.setVisibility(advancedOpen ? View.VISIBLE : View.GONE);
         advancedButton.setText(advancedOpen ? "Masquer les filtres" : "Filtres et recherche");
+        saveFilterPreferences();
     }
 
     private void loadData() {
@@ -375,7 +422,7 @@ public class MainActivity extends Activity {
         executor.execute(() -> {
             try {
                 JSONObject manifest = fetchJson(DATA_BASE + "/manifest.json");
-                JSONObject news = fetchJson(DATA_BASE + "/news.json");
+                JSONObject news = fetchNewsPayload();
                 List<NewsArticle> loaded = parseArticles(news.optJSONArray("articles"));
                 List<String> regions = valuesFromPayload(news.optJSONArray("regions"), loaded, true);
                 List<String> sources = valuesFromPayload(news.optJSONArray("sources"), loaded, false);
@@ -397,10 +444,12 @@ public class MainActivity extends Activity {
     }
 
     private void updateDynamicSpinners(List<String> regions, List<String> sources) {
+        restoringFilters = true;
         fillSpinner(region, "Toutes les régions", regions.toArray(new String[0]));
         fillSpinner(source, "Toutes les sources", sources.toArray(new String[0]));
-        regionFilter = "all";
-        sourceFilter = "all";
+        if (!selectSpinnerValue(region, regionFilter)) regionFilter = "all";
+        if (!selectSpinnerValue(source, sourceFilter)) sourceFilter = "all";
+        restoringFilters = false;
     }
 
     private void applyManifest(JSONObject manifest) {
@@ -435,6 +484,7 @@ public class MainActivity extends Activity {
             article.region = item.optString("region");
             article.url = item.optString("url");
             article.summary = item.optString("summary");
+            article.searchTerms = item.optString("search_terms");
             article.publishedAt = item.optString("published_at", item.optString("scraped_at"));
             article.timestamp = parseDate(article.publishedAt);
             article.tension = item.optInt("tension", 0);
@@ -466,21 +516,18 @@ public class MainActivity extends Activity {
 
     private List<NewsArticle> filteredArticles() {
         long now = System.currentTimeMillis();
-        String normalizedQuery = normalize(query);
         List<NewsArticle> filtered = new ArrayList<>();
         for (NewsArticle article : articles) {
-            if (hideRead != null && hideRead.isChecked() && readIds.contains(article.id)) continue;
-            if (hideSports != null && hideSports.isChecked() && article.isSports) continue;
-            if (childOnly != null && childOnly.isChecked() && !article.childFriendly) continue;
+            if ("english".equals(article.region) && !includeEnglishFilter) continue;
+            if (hideReadFilter && readIds.contains(article.id)) continue;
+            if (hideSportsFilter && article.isSports) continue;
+            if (childOnlyFilter && !article.childFriendly) continue;
             if (!"all".equals(regionFilter) && !article.region.equals(regionFilter)) continue;
             if (!"all".equals(sourceFilter) && !article.source.equals(sourceFilter)) continue;
             if (article.tension > maxTension) continue;
             if (article.priority < minPriority) continue;
             if (!matchesPeriod(article, now)) continue;
-            if (!normalizedQuery.isEmpty()) {
-                String haystack = normalize(article.title + " " + article.summary + " " + article.source + " " + article.region);
-                if (!haystack.contains(normalizedQuery)) continue;
-            }
+            if (!matchesQuery(article, query)) continue;
             filtered.add(article);
         }
         sortArticles(filtered);
@@ -510,6 +557,30 @@ public class MainActivity extends Activity {
                 .equals(Instant.ofEpochMilli(now).atZone(zurich).toLocalDate());
         }
         return true;
+    }
+
+    private boolean matchesQuery(NewsArticle article, String rawQuery) {
+        if (rawQuery == null || rawQuery.trim().isEmpty()) return true;
+        String haystack = normalize(article.title + " " + article.summary + " " + article.source + " " + article.region + " " + article.searchTerms);
+        List<String> quoted = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\"([^\"]+)\"").matcher(rawQuery);
+        while (matcher.find()) {
+            String term = normalize(matcher.group(1));
+            if (!term.isEmpty()) quoted.add(term);
+        }
+        for (String term : quoted) {
+            if (!containsTargetedTerm(haystack, term)) return false;
+        }
+        String unquoted = rawQuery.replaceAll("\"[^\"]+\"", " ").trim();
+        if (unquoted.isEmpty()) return true;
+        return haystack.contains(normalize(unquoted));
+    }
+
+    private boolean containsTargetedTerm(String haystack, String term) {
+        if (term.length() <= 3 && term.matches("[a-z0-9]+")) {
+            return Pattern.compile("(^|[^a-z0-9])" + Pattern.quote(term) + "([^a-z0-9]|$)").matcher(haystack).find();
+        }
+        return haystack.contains(term);
     }
 
     private View articleView(NewsArticle article) {
@@ -614,6 +685,53 @@ public class MainActivity extends Activity {
         }
     }
 
+    private JSONObject fetchNewsPayload() throws Exception {
+        try {
+            return fetchJson(DATA_BASE + "/news-web.json");
+        } catch (Exception ignored) {
+            return fetchJson(DATA_BASE + "/news.json");
+        }
+    }
+
+    private void filtersChanged() {
+        if (restoringFilters) return;
+        saveFilterPreferences();
+        renderArticles();
+    }
+
+    private void loadFilterPreferences() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        query = prefs.getString(PREF_QUERY, "");
+        periodFilter = prefs.getString(PREF_PERIOD, "24h");
+        regionFilter = prefs.getString(PREF_REGION, "all");
+        sourceFilter = prefs.getString(PREF_SOURCE, "all");
+        sortFilter = prefs.getString(PREF_SORT, "newest");
+        maxTension = prefs.getInt(PREF_TENSION, 10);
+        minPriority = prefs.getInt(PREF_PRIORITY, 0);
+        hideReadFilter = prefs.getBoolean(PREF_HIDE_READ, true);
+        hideSportsFilter = prefs.getBoolean(PREF_HIDE_SPORTS, true);
+        childOnlyFilter = prefs.getBoolean(PREF_CHILD_ONLY, false);
+        includeEnglishFilter = prefs.getBoolean(PREF_INCLUDE_ENGLISH, false);
+        advancedOpen = prefs.getBoolean(PREF_ADVANCED_OPEN, false);
+    }
+
+    private void saveFilterPreferences() {
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+        editor.putString(PREF_QUERY, query);
+        editor.putString(PREF_PERIOD, periodFilter);
+        editor.putString(PREF_REGION, regionFilter);
+        editor.putString(PREF_SOURCE, sourceFilter);
+        editor.putString(PREF_SORT, sortFilter);
+        editor.putInt(PREF_TENSION, maxTension);
+        editor.putInt(PREF_PRIORITY, minPriority);
+        editor.putBoolean(PREF_HIDE_READ, hideReadFilter);
+        editor.putBoolean(PREF_HIDE_SPORTS, hideSportsFilter);
+        editor.putBoolean(PREF_CHILD_ONLY, childOnlyFilter);
+        editor.putBoolean(PREF_INCLUDE_ENGLISH, includeEnglishFilter);
+        editor.putBoolean(PREF_ADVANCED_OPEN, advancedOpen);
+        editor.apply();
+    }
+
     private List<String> valuesFromPayload(JSONArray array, List<NewsArticle> fallback, boolean regions) {
         Set<String> values = new HashSet<>();
         if (array != null) {
@@ -712,6 +830,36 @@ public class MainActivity extends Activity {
         spinner.setAdapter(adapter);
     }
 
+    private boolean selectSpinnerValue(Spinner spinner, String value) {
+        if (spinner == null || value == null || "all".equals(value)) {
+            if (spinner != null) spinner.setSelection(0, false);
+            return true;
+        }
+        for (int index = 0; index < spinner.getCount(); index++) {
+            Object item = spinner.getItemAtPosition(index);
+            if (value.equals(String.valueOf(item))) {
+                spinner.setSelection(index, false);
+                return true;
+            }
+        }
+        spinner.setSelection(0, false);
+        return false;
+    }
+
+    private int periodIndex(String value) {
+        if ("today".equals(value)) return 1;
+        if ("7d".equals(value)) return 2;
+        if ("all".equals(value)) return 3;
+        return 0;
+    }
+
+    private int sortIndex(String value) {
+        if ("romand".equals(value)) return 1;
+        if ("calm".equals(value)) return 2;
+        if ("alert".equals(value)) return 3;
+        return 0;
+    }
+
     private View styleSpinnerText(View view, boolean dropdown) {
         if (view instanceof TextView) {
             TextView text = (TextView) view;
@@ -749,7 +897,6 @@ public class MainActivity extends Activity {
         box.setTextSize(14);
         box.setChecked(checked);
         box.setButtonTintList(ColorStateList.valueOf(accentColor));
-        box.setOnCheckedChangeListener((buttonView, isChecked) -> renderArticles());
         return box;
     }
 
@@ -814,6 +961,7 @@ public class MainActivity extends Activity {
         String region = "";
         String url = "";
         String summary = "";
+        String searchTerms = "";
         String publishedAt = "";
         long timestamp = 0;
         int tension = 0;

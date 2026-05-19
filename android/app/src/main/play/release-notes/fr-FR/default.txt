@@ -1,1 +1,1 @@
-Ajout du support Android Auto en mode média : lecture du flash en cours et des derniers flashs par ton depuis l'écran de la voiture.
+Ajout du filtre English / UN dans l'app, avec recherche ciblée entre guillemets et mémorisation des filtres après mise à jour.

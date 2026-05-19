@@ -53,6 +53,30 @@ function normalize(value) {
     .toLowerCase();
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsTargetedTerm(haystack, term) {
+  if (/^[a-z0-9]{1,3}$/.test(term)) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(term)}([^a-z0-9]|$)`).test(haystack);
+  }
+  return haystack.includes(term);
+}
+
+function matchesQuery(article, rawQuery) {
+  const query = rawQuery.trim();
+  if (!query) return true;
+  const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region} ${article.search_terms || ""}`);
+  const quotedTerms = [...query.matchAll(/"([^"]+)"/g)]
+    .map((match) => normalize(match[1]).trim())
+    .filter(Boolean);
+  if (quotedTerms.some((term) => !containsTargetedTerm(haystack, term))) return false;
+  const unquoted = query.replace(/"[^"]+"/g, " ").trim();
+  if (!unquoted) return true;
+  return haystack.includes(normalize(unquoted));
+}
+
 function formatDate(value) {
   if (!value) return "Date inconnue";
   return new Intl.DateTimeFormat("fr-CH", {
@@ -101,6 +125,7 @@ function displayFilterValue(value) {
 function setupFilters(payload) {
   fillSelect(els.region, payload.regions || [], "Toutes les régions");
   fillSelect(els.source, payload.sources || [], "Toutes les sources");
+  applyUrlFilterPreset();
   const listeners = [
     [els.search, "input"],
     [els.region, "change"],
@@ -116,6 +141,14 @@ function setupFilters(payload) {
   ];
   listeners.forEach(([el, event]) => el.addEventListener(event, updateFromControls));
   els.reset.addEventListener("click", resetFilters);
+}
+
+function applyUrlFilterPreset() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("english") === "1" || params.get("english") === "true") {
+    els.english.checked = true;
+    if (params.get("region") === "english") els.region.value = "english";
+  }
 }
 
 function updateFromControls() {
@@ -153,7 +186,6 @@ function resetFilters() {
 }
 
 function filteredArticles() {
-  const query = normalize(state.filters.query);
   const filtered = state.articles.filter((article) => {
     if (article.region === "english" && !state.filters.includeEnglish) return false;
     if (state.filters.region !== "all" && article.region !== state.filters.region) return false;
@@ -164,9 +196,7 @@ function filteredArticles() {
     if (state.filters.childOnly && !article.child_friendly) return false;
     if (article.tension > state.filters.tension) return false;
     if (article.priority < state.filters.priority) return false;
-    if (!query) return true;
-    const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region} ${article.search_terms || ""}`);
-    return haystack.includes(query);
+    return matchesQuery(article, state.filters.query);
   });
 
   return filtered.sort((a, b) => {

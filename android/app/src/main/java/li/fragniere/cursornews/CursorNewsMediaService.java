@@ -34,6 +34,8 @@ public class CursorNewsMediaService extends MediaBrowserService {
     private static final String DATA_BASE = "https://storage.googleapis.com/cursor-news-radio-20260517-audio/current";
     private static final String MANIFEST_URL = DATA_BASE + "/manifest.json";
     private static final String LIVE_AUDIO_URL = DATA_BASE + "/live.mp3";
+    private static final String PREFS = "cursor-news";
+    private static final String PREF_INCLUDE_ENGLISH = "filter-include-english";
     private static final String ROOT_ID = "cursor-news-root";
     private static final String LIVE_ID = "cursor-news-live";
 
@@ -131,7 +133,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
                 next.put(LIVE_ID, new AudioItem(
                     LIVE_ID,
                     "Flash en cours - " + style,
-                    cleanTitle(title),
+                    mediaSubtitle(cleanTitle(title)),
                     absoluteAudioUrl(current.optString("audio_url", LIVE_AUDIO_URL)),
                     true
                 ));
@@ -292,7 +294,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
     }
 
     private AudioItem liveItem() {
-        return new AudioItem(LIVE_ID, "Flash en cours", "Cursor News", LIVE_AUDIO_URL, true);
+        return new AudioItem(LIVE_ID, "Flash en cours", mediaSubtitle("Cursor News"), LIVE_AUDIO_URL, true);
     }
 
     private String absoluteAudioUrl(String url) {
@@ -304,6 +306,11 @@ public class CursorNewsMediaService extends MediaBrowserService {
     private String cleanTitle(String title) {
         String clean = title == null ? "" : title.replace("Cursor News - ", "").trim();
         return clean.isEmpty() ? "Cursor News" : clean;
+    }
+
+    private String mediaSubtitle(String value) {
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_INCLUDE_ENGLISH, false)) return value;
+        return value + " - English / UN actif";
     }
 
     private String normalize(String value) {
