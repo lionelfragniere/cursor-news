@@ -1,1 +1,1 @@
-Ajout du filtre English / UN dans l'app, avec recherche ciblée entre guillemets et mémorisation des filtres après mise à jour.
+Ajout du bouton Tout lu avec confirmation, pour marquer en une fois les actualités affichées comme lues.

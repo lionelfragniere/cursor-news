@@ -1,6 +1,7 @@
 package li.fragniere.cursornews;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
@@ -102,6 +103,7 @@ public class MainActivity extends Activity {
     private LinearLayout advancedFilters;
     private Button playButton;
     private Button advancedButton;
+    private Button markAllReadButton;
     private EditText search;
     private Spinner period;
     private Spinner region;
@@ -209,10 +211,19 @@ public class MainActivity extends Activity {
 
         body.addView(buildFilters());
 
-        resultTitle = label("Actualités", 22, Typeface.BOLD, inkColor);
+        LinearLayout resultsHeader = new LinearLayout(this);
+        resultsHeader.setGravity(Gravity.CENTER_VERTICAL);
+        resultsHeader.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(match(), wrap());
         titleParams.setMargins(0, dp(18), 0, dp(8));
-        body.addView(resultTitle, titleParams);
+        body.addView(resultsHeader, titleParams);
+
+        resultTitle = label("Actualités", 22, Typeface.BOLD, inkColor);
+        resultsHeader.addView(resultTitle, new LinearLayout.LayoutParams(0, wrap(), 1));
+
+        markAllReadButton = actionButton("Tout lu", false);
+        markAllReadButton.setOnClickListener(v -> confirmMarkAllRead());
+        resultsHeader.addView(markAllReadButton);
 
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -502,6 +513,10 @@ public class MainActivity extends Activity {
         list.removeAllViews();
         List<NewsArticle> filtered = filteredArticles();
         resultTitle.setText(filtered.size() + " actualité" + (filtered.size() > 1 ? "s" : ""));
+        if (markAllReadButton != null) {
+            markAllReadButton.setEnabled(!filtered.isEmpty());
+            markAllReadButton.setAlpha(filtered.isEmpty() ? 0.48f : 1f);
+        }
         if (filtered.isEmpty()) {
             TextView empty = label("Aucune actualité ne correspond aux filtres.", 15, Typeface.NORMAL, mutedColor);
             empty.setPadding(dp(14), dp(18), dp(14), dp(18));
@@ -629,10 +644,43 @@ public class MainActivity extends Activity {
         if (id == null || id.isEmpty()) return;
         if (read) readIds.add(id);
         else readIds.remove(id);
+        persistReadIds();
+        renderArticles();
+    }
+
+    private void persistReadIds() {
         SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
         editor.putStringSet(READ_IDS, new HashSet<>(readIds));
         editor.apply();
+    }
+
+    private void confirmMarkAllRead() {
+        List<NewsArticle> targets = filteredArticles();
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "Aucune actualité à marquer", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String message = targets.size() == 1
+            ? "Marquer l'actualité affichée comme lue ?"
+            : "Marquer les " + targets.size() + " actualités affichées comme lues ?";
+        new AlertDialog.Builder(this)
+            .setTitle("Tout marquer comme lu")
+            .setMessage(message)
+            .setNegativeButton("Annuler", null)
+            .setPositiveButton("Confirmer", (dialog, which) -> markAllRead(targets))
+            .show();
+    }
+
+    private void markAllRead(List<NewsArticle> targets) {
+        int count = 0;
+        for (NewsArticle article : targets) {
+            if (article.id == null || article.id.isEmpty() || readIds.contains(article.id)) continue;
+            readIds.add(article.id);
+            count++;
+        }
+        persistReadIds();
         renderArticles();
+        Toast.makeText(this, count + " actualité" + (count > 1 ? "s" : "") + " marquée" + (count > 1 ? "s" : "") + " comme lue" + (count > 1 ? "s" : ""), Toast.LENGTH_SHORT).show();
     }
 
     private void toggleAudio() {
