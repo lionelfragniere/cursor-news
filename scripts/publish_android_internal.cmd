@@ -32,4 +32,4 @@ if not "%ANDROID_VERSION_CODE%"=="" echo Version code: %ANDROID_VERSION_CODE%
 if not "%ANDROID_VERSION_NAME%"=="" echo Version name: %ANDROID_VERSION_NAME%
 echo.
 
-call gradlew.bat :app:publishReleaseBundle :app:publishReleaseListing --console=plain
+call gradlew.bat :app:publishReleaseBundle :app:publishReleaseListing -PenablePlayPublisher=true --console=plain
