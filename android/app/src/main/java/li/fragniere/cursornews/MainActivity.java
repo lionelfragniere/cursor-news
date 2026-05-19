@@ -3,6 +3,7 @@ package li.fragniere.cursornews;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -16,13 +17,17 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowInsets;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,6 +45,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,10 +53,20 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@SuppressWarnings("deprecation")
 public class MainActivity extends Activity {
     private static final String DATA_BASE = "https://storage.googleapis.com/cursor-news-radio-20260517-audio/current";
     private static final String PREFS = "cursor-news";
     private static final String READ_IDS = "read-ids";
+
+    private static final int BG = Color.rgb(246, 245, 242);
+    private static final int PANEL = Color.WHITE;
+    private static final int INK = Color.rgb(23, 26, 29);
+    private static final int MUTED = Color.rgb(104, 112, 122);
+    private static final int LINE = Color.rgb(217, 214, 207);
+    private static final int ACCENT = Color.rgb(15, 118, 110);
+    private static final int ACCENT_2 = Color.rgb(161, 52, 24);
+    private static final int SOFT = Color.rgb(238, 247, 245);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -63,13 +79,30 @@ public class MainActivity extends Activity {
     private TextView status;
     private TextView resultTitle;
     private TextView currentFlash;
+    private TextView tensionValue;
+    private TextView priorityValue;
+    private LinearLayout advancedFilters;
     private Button playButton;
+    private Button advancedButton;
     private EditText search;
     private Spinner period;
+    private Spinner region;
+    private Spinner source;
+    private Spinner sort;
     private CheckBox hideRead;
+    private CheckBox hideSports;
+    private CheckBox childOnly;
+    private SeekBar tension;
+    private SeekBar priority;
 
     private String query = "";
     private String periodFilter = "24h";
+    private String regionFilter = "all";
+    private String sourceFilter = "all";
+    private String sortFilter = "newest";
+    private int maxTension = 10;
+    private int minPriority = 0;
+    private boolean advancedOpen = false;
     private String audioUrl = DATA_BASE + "/live.mp3";
     private MediaPlayer mediaPlayer;
     private boolean audioPreparing = false;
@@ -77,6 +110,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        configureSystemBars();
         readIds.addAll(getSharedPreferences(PREFS, MODE_PRIVATE).getStringSet(READ_IDS, new HashSet<>()));
         buildUi();
         loadData();
@@ -92,22 +126,36 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void configureSystemBars() {
+        Window window = getWindow();
+        window.setStatusBarColor(BG);
+        window.setNavigationBarColor(BG);
+        window.getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        );
+    }
+
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(246, 245, 242));
+        root.setBackgroundColor(BG);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            view.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
+            return insets;
+        });
 
         root.addView(buildHeader());
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(14), dp(12), dp(14), dp(24));
+        body.setPadding(dp(14), dp(12), dp(14), dp(32));
         scroll.addView(body);
 
         body.addView(buildFilters());
 
-        resultTitle = label("Actualités", 22, Typeface.BOLD, Color.rgb(23, 26, 29));
+        resultTitle = label("Actualités", 22, Typeface.BOLD, INK);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(match(), wrap());
         titleParams.setMargins(0, dp(18), 0, dp(8));
         body.addView(resultTitle, titleParams);
@@ -123,52 +171,73 @@ public class MainActivity extends Activity {
     private View buildHeader() {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(16), dp(14), dp(16), dp(12));
-        header.setBackgroundColor(Color.WHITE);
+        header.setPadding(dp(14), dp(12), dp(14), dp(12));
+        header.setBackgroundColor(PANEL);
+        header.setElevation(dp(2));
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
 
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.logo);
+        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        logoParams.setMargins(0, 0, dp(12), 0);
+        top.addView(logo, logoParams);
+
         LinearLayout titleBlock = new LinearLayout(this);
         titleBlock.setOrientation(LinearLayout.VERTICAL);
-        titleBlock.addView(label("Suisse romande", 12, Typeface.BOLD, Color.rgb(161, 52, 24)));
-        titleBlock.addView(label("Cursor News", 30, Typeface.BOLD, Color.rgb(23, 26, 29)));
+        titleBlock.addView(label("Suisse romande", 12, Typeface.BOLD, ACCENT_2));
+        titleBlock.addView(label("Cursor News", 28, Typeface.BOLD, INK));
         top.addView(titleBlock, new LinearLayout.LayoutParams(0, wrap(), 1));
 
-        Button refresh = new Button(this);
-        refresh.setText("Actualiser");
+        Button refresh = actionButton("Actualiser", false);
         refresh.setOnClickListener(v -> loadData());
         top.addView(refresh);
         header.addView(top);
 
-        status = label("Chargement...", 13, Typeface.BOLD, Color.rgb(15, 118, 110));
-        header.addView(status);
+        status = label("Chargement...", 13, Typeface.BOLD, ACCENT);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(match(), wrap());
+        statusParams.setMargins(0, dp(6), 0, dp(8));
+        header.addView(status, statusParams);
 
-        LinearLayout player = new LinearLayout(this);
+        LinearLayout player = roundedPanel(SOFT, LINE);
         player.setGravity(Gravity.CENTER_VERTICAL);
         player.setOrientation(LinearLayout.HORIZONTAL);
-        player.setPadding(0, dp(8), 0, 0);
+        player.setPadding(dp(12), dp(8), dp(10), dp(8));
 
-        currentFlash = label("Flash en cours", 14, Typeface.BOLD, Color.rgb(23, 26, 29));
+        currentFlash = label("Flash en cours", 14, Typeface.BOLD, INK);
         player.addView(currentFlash, new LinearLayout.LayoutParams(0, wrap(), 1));
 
-        playButton = new Button(this);
-        playButton.setText("Lire");
+        playButton = actionButton("Lire", true);
         playButton.setOnClickListener(v -> toggleAudio());
         player.addView(playButton);
 
-        header.addView(player);
+        header.addView(player, new LinearLayout.LayoutParams(match(), wrap()));
         return header;
     }
 
     private View buildFilters() {
-        LinearLayout filters = panel();
+        LinearLayout filters = roundedPanel(PANEL, LINE);
         filters.setOrientation(LinearLayout.VERTICAL);
+        filters.setPadding(dp(14), dp(12), dp(14), dp(12));
+
+        advancedButton = actionButton("Filtres et recherche", false);
+        advancedButton.setOnClickListener(v -> toggleAdvancedFilters());
+        filters.addView(advancedButton, new LinearLayout.LayoutParams(match(), wrap()));
+
+        advancedFilters = new LinearLayout(this);
+        advancedFilters.setOrientation(LinearLayout.VERTICAL);
+        advancedFilters.setVisibility(View.GONE);
+        filters.addView(advancedFilters);
 
         search = new EditText(this);
         search.setSingleLine(true);
         search.setHint("Recherche: sujet, lieu, source...");
+        search.setTextColor(INK);
+        search.setHintTextColor(MUTED);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -177,36 +246,95 @@ public class MainActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable s) {}
         });
-        filters.addView(search, new LinearLayout.LayoutParams(match(), wrap()));
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(match(), wrap());
+        searchParams.setMargins(0, dp(10), 0, 0);
+        advancedFilters.addView(search, searchParams);
 
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, dp(10), 0, 0);
+        period = spinner();
+        region = spinner();
+        source = spinner();
+        sort = spinner();
+        fillSpinner(period, "24 dernières heures", "Aujourd'hui", "7 derniers jours", "Tout");
+        fillSpinner(region, "Toutes les régions");
+        fillSpinner(source, "Toutes les sources");
+        fillSpinner(sort, "Plus récent", "Focus romand", "Plus calme", "Plus tendu");
 
-        period = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[] {
-            "24 dernières heures", "Aujourd'hui", "7 derniers jours", "Tout"
-        });
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        period.setAdapter(adapter);
-        period.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                periodFilter = position == 1 ? "today" : position == 2 ? "7d" : position == 3 ? "all" : "24h";
-                renderArticles();
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
-        });
-        row.addView(period, new LinearLayout.LayoutParams(0, wrap(), 1));
+        hideRead = checkbox("Masquer lus", true);
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setGravity(Gravity.CENTER_VERTICAL);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams quickParams = new LinearLayout.LayoutParams(match(), wrap());
+        quickParams.setMargins(0, dp(10), 0, 0);
+        quickRow.setLayoutParams(quickParams);
+        quickRow.addView(field("Période", period), new LinearLayout.LayoutParams(0, wrap(), 1));
+        LinearLayout.LayoutParams hideReadParams = new LinearLayout.LayoutParams(0, wrap(), 1);
+        hideReadParams.setMargins(dp(12), dp(18), 0, 0);
+        quickRow.addView(hideRead, hideReadParams);
+        advancedFilters.addView(quickRow);
 
-        hideRead = new CheckBox(this);
-        hideRead.setText("Masquer lus");
-        hideRead.setChecked(true);
-        hideRead.setOnCheckedChangeListener((buttonView, isChecked) -> renderArticles());
-        row.addView(hideRead);
-        filters.addView(row);
+        advancedFilters.addView(twoColumnRow(field("Région", region), field("Source", source)));
+        advancedFilters.addView(twoColumnRow(field("Tri", sort), label("Les curseurs affinent la sélection publiée.", 12, Typeface.BOLD, MUTED)));
+
+        period.setOnItemSelectedListener(listener(position -> {
+            periodFilter = position == 1 ? "today" : position == 2 ? "7d" : position == 3 ? "all" : "24h";
+            renderArticles();
+        }));
+        region.setOnItemSelectedListener(listener(position -> {
+            regionFilter = position <= 0 ? "all" : String.valueOf(region.getSelectedItem());
+            renderArticles();
+        }));
+        source.setOnItemSelectedListener(listener(position -> {
+            sourceFilter = position <= 0 ? "all" : String.valueOf(source.getSelectedItem());
+            renderArticles();
+        }));
+        sort.setOnItemSelectedListener(listener(position -> {
+            sortFilter = position == 1 ? "romand" : position == 2 ? "calm" : position == 3 ? "alert" : "newest";
+            renderArticles();
+        }));
+
+        tensionValue = label("10", 13, Typeface.BOLD, ACCENT);
+        tension = new SeekBar(this);
+        tension.setMax(10);
+        tension.setProgress(10);
+        tension.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        tension.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        tension.setOnSeekBarChangeListener(seekListener(value -> {
+            maxTension = value;
+            tensionValue.setText(String.valueOf(value));
+            renderArticles();
+        }));
+
+        priorityValue = label("0", 13, Typeface.BOLD, ACCENT);
+        priority = new SeekBar(this);
+        priority.setMax(14);
+        priority.setProgress(0);
+        priority.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        priority.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        priority.setOnSeekBarChangeListener(seekListener(value -> {
+            minPriority = value * 10;
+            priorityValue.setText(String.valueOf(minPriority));
+            renderArticles();
+        }));
+
+        advancedFilters.addView(sliderField("Tension max", tensionValue, tension));
+        advancedFilters.addView(sliderField("Focus romand min.", priorityValue, priority));
+
+        LinearLayout toggles = new LinearLayout(this);
+        toggles.setOrientation(LinearLayout.VERTICAL);
+        toggles.setPadding(0, dp(4), 0, 0);
+        childOnly = checkbox("Adapté enfants", false);
+        hideSports = checkbox("Masquer sport", true);
+        toggles.addView(childOnly);
+        toggles.addView(hideSports);
+        advancedFilters.addView(toggles);
 
         return filters;
+    }
+
+    private void toggleAdvancedFilters() {
+        advancedOpen = !advancedOpen;
+        advancedFilters.setVisibility(advancedOpen ? View.VISIBLE : View.GONE);
+        advancedButton.setText(advancedOpen ? "Masquer les filtres" : "Filtres et recherche");
     }
 
     private void loadData() {
@@ -216,10 +344,13 @@ public class MainActivity extends Activity {
                 JSONObject manifest = fetchJson(DATA_BASE + "/manifest.json");
                 JSONObject news = fetchJson(DATA_BASE + "/news.json");
                 List<NewsArticle> loaded = parseArticles(news.optJSONArray("articles"));
+                List<String> regions = valuesFromPayload(news.optJSONArray("regions"), loaded, true);
+                List<String> sources = valuesFromPayload(news.optJSONArray("sources"), loaded, false);
                 main.post(() -> {
                     applyManifest(manifest);
                     articles.clear();
                     articles.addAll(loaded);
+                    updateDynamicSpinners(regions, sources);
                     status.setText(articles.size() + " news chargées");
                     renderArticles();
                 });
@@ -230,6 +361,13 @@ public class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void updateDynamicSpinners(List<String> regions, List<String> sources) {
+        fillSpinner(region, "Toutes les régions", regions.toArray(new String[0]));
+        fillSpinner(source, "Toutes les sources", sources.toArray(new String[0]));
+        regionFilter = "all";
+        sourceFilter = "all";
     }
 
     private void applyManifest(JSONObject manifest) {
@@ -267,8 +405,10 @@ public class MainActivity extends Activity {
             article.publishedAt = item.optString("published_at", item.optString("scraped_at"));
             article.timestamp = parseDate(article.publishedAt);
             article.tension = item.optInt("tension", 0);
+            article.calm = item.optInt("calm", 0);
             article.priority = item.optInt("priority", 0);
             article.childFriendly = item.optBoolean("child_friendly", false);
+            article.isSports = item.optBoolean("is_sports", false);
             parsed.add(article);
         }
         return parsed;
@@ -280,7 +420,7 @@ public class MainActivity extends Activity {
         List<NewsArticle> filtered = filteredArticles();
         resultTitle.setText(filtered.size() + " actualité" + (filtered.size() > 1 ? "s" : ""));
         if (filtered.isEmpty()) {
-            TextView empty = label("Aucune actualité ne correspond aux filtres.", 15, Typeface.NORMAL, Color.rgb(104, 112, 122));
+            TextView empty = label("Aucune actualité ne correspond aux filtres.", 15, Typeface.NORMAL, MUTED);
             empty.setPadding(dp(14), dp(18), dp(14), dp(18));
             list.addView(empty);
             return;
@@ -296,7 +436,13 @@ public class MainActivity extends Activity {
         String normalizedQuery = normalize(query);
         List<NewsArticle> filtered = new ArrayList<>();
         for (NewsArticle article : articles) {
-            if (hideRead.isChecked() && readIds.contains(article.id)) continue;
+            if (hideRead != null && hideRead.isChecked() && readIds.contains(article.id)) continue;
+            if (hideSports != null && hideSports.isChecked() && article.isSports) continue;
+            if (childOnly != null && childOnly.isChecked() && !article.childFriendly) continue;
+            if (!"all".equals(regionFilter) && !article.region.equals(regionFilter)) continue;
+            if (!"all".equals(sourceFilter) && !article.source.equals(sourceFilter)) continue;
+            if (article.tension > maxTension) continue;
+            if (article.priority < minPriority) continue;
             if (!matchesPeriod(article, now)) continue;
             if (!normalizedQuery.isEmpty()) {
                 String haystack = normalize(article.title + " " + article.summary + " " + article.source + " " + article.region);
@@ -304,7 +450,20 @@ public class MainActivity extends Activity {
             }
             filtered.add(article);
         }
+        sortArticles(filtered);
         return filtered;
+    }
+
+    private void sortArticles(List<NewsArticle> items) {
+        if ("romand".equals(sortFilter)) {
+            Collections.sort(items, (a, b) -> b.priority != a.priority ? b.priority - a.priority : Long.compare(b.timestamp, a.timestamp));
+        } else if ("calm".equals(sortFilter)) {
+            Collections.sort(items, (a, b) -> a.tension != b.tension ? a.tension - b.tension : b.calm - a.calm);
+        } else if ("alert".equals(sortFilter)) {
+            Collections.sort(items, (a, b) -> b.tension != a.tension ? b.tension - a.tension : Long.compare(b.timestamp, a.timestamp));
+        } else {
+            Collections.sort(items, (a, b) -> Long.compare(b.timestamp, a.timestamp));
+        }
     }
 
     private boolean matchesPeriod(NewsArticle article, long now) {
@@ -321,14 +480,15 @@ public class MainActivity extends Activity {
     }
 
     private View articleView(NewsArticle article) {
-        LinearLayout card = panel();
+        LinearLayout card = roundedPanel(PANEL, LINE);
         card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match(), wrap());
         params.setMargins(0, 0, 0, dp(10));
         card.setLayoutParams(params);
         if (readIds.contains(article.id)) card.setAlpha(0.72f);
 
-        TextView title = label(article.title, 18, Typeface.BOLD, Color.rgb(23, 26, 29));
+        TextView title = label(article.title, 18, Typeface.BOLD, INK);
         title.setOnClickListener(v -> {
             setRead(article.id, true);
             if (!article.url.isEmpty()) startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(article.url)));
@@ -336,19 +496,26 @@ public class MainActivity extends Activity {
         card.addView(title);
 
         String meta = article.source + " - " + dateFormat.format(Instant.ofEpochMilli(Math.max(0, article.timestamp)));
-        TextView metaView = label(meta, 12, Typeface.BOLD, Color.rgb(104, 112, 122));
-        card.addView(metaView);
+        TextView metaView = label(meta, 12, Typeface.BOLD, MUTED);
+        LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(match(), wrap());
+        metaParams.setMargins(0, dp(2), 0, 0);
+        card.addView(metaView, metaParams);
 
         TextView summary = label(article.summary, 14, Typeface.NORMAL, Color.rgb(70, 76, 84));
-        summary.setPadding(0, dp(6), 0, dp(8));
-        card.addView(summary);
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(match(), wrap());
+        summaryParams.setMargins(0, dp(8), 0, dp(8));
+        card.addView(summary, summaryParams);
 
-        TextView tags = label(article.region + "  tension " + article.tension + "/10  focus " + article.priority + (article.childFriendly ? "  enfants" : ""), 12, Typeface.BOLD, Color.rgb(15, 118, 110));
+        TextView tags = label(
+            article.region + "  tension " + article.tension + "/10  focus " + article.priority
+                + (article.childFriendly ? "  enfants" : "") + (article.isSports ? "  sport" : ""),
+            12,
+            Typeface.BOLD,
+            ACCENT
+        );
         card.addView(tags);
 
-        CheckBox read = new CheckBox(this);
-        read.setText("Lu");
-        read.setChecked(readIds.contains(article.id));
+        CheckBox read = checkbox("Lu", readIds.contains(article.id));
         read.setOnCheckedChangeListener((buttonView, isChecked) -> setRead(article.id, isChecked));
         card.addView(read);
         return card;
@@ -403,7 +570,7 @@ public class MainActivity extends Activity {
         HttpURLConnection connection = (HttpURLConnection) new URL(url + "?v=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(12000);
-        connection.setRequestProperty("User-Agent", "CursorNewsAndroid/0.1");
+        connection.setRequestProperty("User-Agent", "CursorNewsAndroid/0.2");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
             StringBuilder builder = new StringBuilder();
             String line;
@@ -412,6 +579,22 @@ public class MainActivity extends Activity {
         } finally {
             connection.disconnect();
         }
+    }
+
+    private List<String> valuesFromPayload(JSONArray array, List<NewsArticle> fallback, boolean regions) {
+        Set<String> values = new HashSet<>();
+        if (array != null) {
+            for (int index = 0; index < array.length(); index++) {
+                String value = array.optString(index, "");
+                if (!value.isEmpty()) values.add(value);
+            }
+        }
+        if (values.isEmpty()) {
+            for (NewsArticle article : fallback) values.add(regions ? article.region : article.source);
+        }
+        List<String> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        return sorted;
     }
 
     private long parseDate(String value) {
@@ -432,13 +615,114 @@ public class MainActivity extends Activity {
         return normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "").toLowerCase(Locale.FRANCE).trim();
     }
 
-    private LinearLayout panel() {
-        LinearLayout view = new LinearLayout(this);
-        view.setPadding(dp(14), dp(12), dp(14), dp(12));
+    private LinearLayout field(String label, View input) {
+        LinearLayout field = new LinearLayout(this);
+        field.setOrientation(LinearLayout.VERTICAL);
+        field.addView(label(label, 12, Typeface.BOLD, MUTED));
+        field.addView(input, new LinearLayout.LayoutParams(match(), wrap()));
+        return field;
+    }
+
+    private LinearLayout twoColumnRow(View left, View right) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(match(), wrap());
+        rowParams.setMargins(0, dp(10), 0, 0);
+        row.setLayoutParams(rowParams);
+        LinearLayout.LayoutParams childParams = new LinearLayout.LayoutParams(0, wrap(), 1);
+        childParams.setMargins(0, 0, dp(8), 0);
+        row.addView(left, childParams);
+        LinearLayout.LayoutParams rightParams = new LinearLayout.LayoutParams(0, wrap(), 1);
+        rightParams.setMargins(dp(8), 0, 0, 0);
+        row.addView(right, rightParams);
+        return row;
+    }
+
+    private LinearLayout sliderField(String title, TextView value, SeekBar seekBar) {
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match(), wrap());
+        params.setMargins(0, dp(10), 0, 0);
+        wrap.setLayoutParams(params);
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.addView(label(title, 12, Typeface.BOLD, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1));
+        row.addView(value);
+        wrap.addView(row);
+        wrap.addView(seekBar, new LinearLayout.LayoutParams(match(), wrap()));
+        return wrap;
+    }
+
+    private Spinner spinner() {
+        Spinner view = new Spinner(this);
+        view.setMinimumHeight(dp(42));
+        return view;
+    }
+
+    private void fillSpinner(Spinner spinner, String first, String... rest) {
+        List<String> values = new ArrayList<>();
+        values.add(first);
+        Collections.addAll(values, rest);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, values);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+    }
+
+    private AdapterView.OnItemSelectedListener listener(PositionCallback callback) {
+        return new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                callback.onPosition(position);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        };
+    }
+
+    private SeekBar.OnSeekBarChangeListener seekListener(PositionCallback callback) {
+        return new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                callback.onPosition(progress);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        };
+    }
+
+    private CheckBox checkbox(String text, boolean checked) {
+        CheckBox box = new CheckBox(this);
+        box.setText(text);
+        box.setTextColor(INK);
+        box.setTextSize(14);
+        box.setChecked(checked);
+        box.setButtonTintList(ColorStateList.valueOf(ACCENT));
+        box.setOnCheckedChangeListener((buttonView, isChecked) -> renderArticles());
+        return box;
+    }
+
+    private Button actionButton(String text, boolean primary) {
+        Button button = new Button(this);
+        button.setAllCaps(false);
+        button.setText(text);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(primary ? Color.WHITE : INK);
+        button.setMinHeight(dp(38));
+        button.setMinimumHeight(dp(38));
+        button.setPadding(dp(12), 0, dp(12), 0);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.WHITE);
+        bg.setColor(primary ? ACCENT : SOFT);
         bg.setCornerRadius(dp(8));
-        bg.setStroke(dp(1), Color.rgb(217, 214, 207));
+        bg.setStroke(dp(1), primary ? ACCENT : LINE);
+        button.setBackground(bg);
+        return button;
+    }
+
+    private LinearLayout roundedPanel(int color, int stroke) {
+        LinearLayout view = new LinearLayout(this);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(8));
+        bg.setStroke(dp(1), stroke);
         view.setBackground(bg);
         return view;
     }
@@ -465,6 +749,10 @@ public class MainActivity extends Activity {
         return ViewGroup.LayoutParams.WRAP_CONTENT;
     }
 
+    private interface PositionCallback {
+        void onPosition(int position);
+    }
+
     private static class NewsArticle {
         String id = "";
         String title = "";
@@ -475,7 +763,9 @@ public class MainActivity extends Activity {
         String publishedAt = "";
         long timestamp = 0;
         int tension = 0;
+        int calm = 0;
         int priority = 0;
         boolean childFriendly = false;
+        boolean isSports = false;
     }
 }
