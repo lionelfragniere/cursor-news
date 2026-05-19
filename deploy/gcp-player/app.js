@@ -1,5 +1,4 @@
 const READ_STORAGE_KEY = "cursor-news-read-articles-v1";
-const ACCESS_STORAGE_KEY = "cursor-news-accessibility-v1";
 const GCP_DATA_BASE_URL = "https://storage.googleapis.com/cursor-news-radio-20260517-audio/current";
 const APP_TIME_ZONE = "Europe/Zurich";
 
@@ -7,10 +6,6 @@ const state = {
   articles: [],
   generatedAt: null,
   readIds: new Set(),
-  access: {
-    largeText: false,
-    highContrast: false,
-  },
   filters: {
     query: "",
     region: "all",
@@ -31,8 +26,6 @@ const els = {
   currentFlashLabel: document.querySelector("#current-flash-label"),
   bulletinAudioLink: document.querySelector("#bulletin-audio-link"),
   bulletinGrid: document.querySelector("#bulletin-grid"),
-  textSize: document.querySelector("#text-size-toggle"),
-  contrast: document.querySelector("#contrast-toggle"),
   search: document.querySelector("#search"),
   region: document.querySelector("#region-filter"),
   date: document.querySelector("#date-filter"),
@@ -77,44 +70,6 @@ function loadReadIds() {
 
 function saveReadIds() {
   localStorage.setItem(READ_STORAGE_KEY, JSON.stringify([...state.readIds]));
-}
-
-function loadAccess() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(ACCESS_STORAGE_KEY) || "{}");
-    return {
-      largeText: Boolean(parsed.largeText),
-      highContrast: Boolean(parsed.highContrast),
-    };
-  } catch {
-    return { largeText: false, highContrast: false };
-  }
-}
-
-function saveAccess() {
-  localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(state.access));
-}
-
-function applyAccess() {
-  document.body.classList.toggle("large-text", state.access.largeText);
-  document.body.classList.toggle("high-contrast", state.access.highContrast);
-  els.textSize.setAttribute("aria-pressed", String(state.access.largeText));
-  els.contrast.setAttribute("aria-pressed", String(state.access.highContrast));
-}
-
-function setupAccessControls() {
-  state.access = loadAccess();
-  applyAccess();
-  els.textSize.addEventListener("click", () => {
-    state.access.largeText = !state.access.largeText;
-    applyAccess();
-    saveAccess();
-  });
-  els.contrast.addEventListener("click", () => {
-    state.access.highContrast = !state.access.highContrast;
-    applyAccess();
-    saveAccess();
-  });
 }
 
 function isRead(article) {
@@ -413,7 +368,6 @@ function updateStatus() {
 }
 
 async function init() {
-  setupAccessControls();
   try {
     const [manifestResponse, response] = await Promise.all([
       fetch(`${GCP_DATA_BASE_URL}/manifest.json?v=${Date.now()}`, { cache: "no-store" }),

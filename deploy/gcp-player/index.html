@@ -21,34 +21,32 @@
           </div>
         </div>
         <div class="top-actions">
-          <div class="access-controls" aria-label="Préférences de lecture">
-            <button id="text-size-toggle" class="access-btn" type="button" aria-pressed="false">A+</button>
-            <button id="contrast-toggle" class="access-btn" type="button" aria-pressed="false">Contraste</button>
-          </div>
           <div class="status" id="data-status">Chargement...</div>
-          <div class="mini-player" aria-label="Flash audio en cours">
-            <div class="mini-player-copy">
-              <span class="eyebrow">Flash en cours</span>
-              <strong id="current-flash-label">Audio</strong>
-            </div>
-            <audio
-              id="radio-player"
-              controls
-              loop
-              preload="metadata"
-              src="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3"
-            ></audio>
-            <a id="bulletin-audio-link" href="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3">MP3</a>
-          </div>
-          <details class="bulletins-drawer header-bulletins" aria-label="Bulletins audio par ton">
-            <summary>
-              <div>
-                <span class="eyebrow">Audio à la carte</span>
-                <strong>Écouter les derniers flashs par ton</strong>
+          <section class="audio-panel" aria-label="Audio Cursor News">
+            <div class="mini-player" aria-label="Flash audio en cours">
+              <div class="mini-player-copy">
+                <span class="eyebrow">Flash en cours</span>
+                <strong id="current-flash-label">Audio</strong>
               </div>
-            </summary>
-            <div class="bulletin-grid" id="bulletin-grid"></div>
-          </details>
+              <audio
+                id="radio-player"
+                controls
+                loop
+                preload="metadata"
+                src="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3"
+              ></audio>
+              <a id="bulletin-audio-link" href="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3">MP3</a>
+            </div>
+            <details class="bulletins-drawer header-bulletins" aria-label="Bulletins audio par ton">
+              <summary>
+                <div>
+                  <span class="eyebrow">Audio à la carte</span>
+                  <strong>Écouter les derniers flashs par ton</strong>
+                </div>
+              </summary>
+              <div class="bulletin-grid" id="bulletin-grid"></div>
+            </details>
+          </section>
         </div>
       </header>
 
