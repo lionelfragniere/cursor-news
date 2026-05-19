@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -59,14 +60,17 @@ public class MainActivity extends Activity {
     private static final String PREFS = "cursor-news";
     private static final String READ_IDS = "read-ids";
 
-    private static final int BG = Color.rgb(246, 245, 242);
-    private static final int PANEL = Color.WHITE;
-    private static final int INK = Color.rgb(23, 26, 29);
-    private static final int MUTED = Color.rgb(104, 112, 122);
-    private static final int LINE = Color.rgb(217, 214, 207);
-    private static final int ACCENT = Color.rgb(15, 118, 110);
-    private static final int ACCENT_2 = Color.rgb(161, 52, 24);
-    private static final int SOFT = Color.rgb(238, 247, 245);
+    private boolean darkMode;
+    private int bgColor;
+    private int panelColor;
+    private int inkColor;
+    private int mutedColor;
+    private int lineColor;
+    private int accentColor;
+    private int accentAltColor;
+    private int softColor;
+    private int summaryColor;
+    private int primaryButtonTextColor;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -110,6 +114,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        applyThemeColors();
         configureSystemBars();
         readIds.addAll(getSharedPreferences(PREFS, MODE_PRIVATE).getStringSet(READ_IDS, new HashSet<>()));
         buildUi();
@@ -128,17 +133,45 @@ public class MainActivity extends Activity {
 
     private void configureSystemBars() {
         Window window = getWindow();
-        window.setStatusBarColor(BG);
-        window.setNavigationBarColor(BG);
-        window.getDecorView().setSystemUiVisibility(
+        window.setStatusBarColor(bgColor);
+        window.setNavigationBarColor(bgColor);
+        window.getDecorView().setSystemUiVisibility(darkMode ? 0 :
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         );
+    }
+
+    private void applyThemeColors() {
+        int nightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        darkMode = nightMode == Configuration.UI_MODE_NIGHT_YES;
+        if (darkMode) {
+            bgColor = Color.rgb(18, 22, 24);
+            panelColor = Color.rgb(26, 31, 34);
+            inkColor = Color.rgb(240, 243, 244);
+            mutedColor = Color.rgb(170, 178, 184);
+            lineColor = Color.rgb(61, 68, 72);
+            accentColor = Color.rgb(76, 196, 184);
+            accentAltColor = Color.rgb(255, 146, 95);
+            softColor = Color.rgb(28, 50, 49);
+            summaryColor = Color.rgb(208, 214, 218);
+            primaryButtonTextColor = Color.rgb(5, 35, 33);
+        } else {
+            bgColor = Color.rgb(246, 245, 242);
+            panelColor = Color.WHITE;
+            inkColor = Color.rgb(23, 26, 29);
+            mutedColor = Color.rgb(104, 112, 122);
+            lineColor = Color.rgb(217, 214, 207);
+            accentColor = Color.rgb(15, 118, 110);
+            accentAltColor = Color.rgb(161, 52, 24);
+            softColor = Color.rgb(238, 247, 245);
+            summaryColor = Color.rgb(70, 76, 84);
+            primaryButtonTextColor = Color.WHITE;
+        }
     }
 
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(BG);
+        root.setBackgroundColor(bgColor);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
             return insets;
@@ -155,7 +188,7 @@ public class MainActivity extends Activity {
 
         body.addView(buildFilters());
 
-        resultTitle = label("Actualités", 22, Typeface.BOLD, INK);
+        resultTitle = label("Actualités", 22, Typeface.BOLD, inkColor);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(match(), wrap());
         titleParams.setMargins(0, dp(18), 0, dp(8));
         body.addView(resultTitle, titleParams);
@@ -172,7 +205,7 @@ public class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
         header.setPadding(dp(14), dp(12), dp(14), dp(12));
-        header.setBackgroundColor(PANEL);
+        header.setBackgroundColor(panelColor);
         header.setElevation(dp(2));
 
         LinearLayout top = new LinearLayout(this);
@@ -182,15 +215,15 @@ public class MainActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.logo);
         logo.setAdjustViewBounds(true);
-        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(96), dp(64));
         logoParams.setMargins(0, 0, dp(12), 0);
         top.addView(logo, logoParams);
 
         LinearLayout titleBlock = new LinearLayout(this);
         titleBlock.setOrientation(LinearLayout.VERTICAL);
-        titleBlock.addView(label("Suisse romande", 12, Typeface.BOLD, ACCENT_2));
-        titleBlock.addView(label("Cursor News", 28, Typeface.BOLD, INK));
+        titleBlock.addView(label("Suisse romande", 12, Typeface.BOLD, accentAltColor));
+        titleBlock.addView(label("Cursor News", 28, Typeface.BOLD, inkColor));
         top.addView(titleBlock, new LinearLayout.LayoutParams(0, wrap(), 1));
 
         Button refresh = actionButton("Actualiser", false);
@@ -198,17 +231,17 @@ public class MainActivity extends Activity {
         top.addView(refresh);
         header.addView(top);
 
-        status = label("Chargement...", 13, Typeface.BOLD, ACCENT);
+        status = label("Chargement...", 13, Typeface.BOLD, accentColor);
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(match(), wrap());
         statusParams.setMargins(0, dp(6), 0, dp(8));
         header.addView(status, statusParams);
 
-        LinearLayout player = roundedPanel(SOFT, LINE);
+        LinearLayout player = roundedPanel(softColor, lineColor);
         player.setGravity(Gravity.CENTER_VERTICAL);
         player.setOrientation(LinearLayout.HORIZONTAL);
         player.setPadding(dp(12), dp(8), dp(10), dp(8));
 
-        currentFlash = label("Flash en cours", 14, Typeface.BOLD, INK);
+        currentFlash = label("Flash en cours", 14, Typeface.BOLD, inkColor);
         player.addView(currentFlash, new LinearLayout.LayoutParams(0, wrap(), 1));
 
         playButton = actionButton("Lire", true);
@@ -220,7 +253,7 @@ public class MainActivity extends Activity {
     }
 
     private View buildFilters() {
-        LinearLayout filters = roundedPanel(PANEL, LINE);
+        LinearLayout filters = roundedPanel(panelColor, lineColor);
         filters.setOrientation(LinearLayout.VERTICAL);
         filters.setPadding(dp(14), dp(12), dp(14), dp(12));
 
@@ -236,8 +269,8 @@ public class MainActivity extends Activity {
         search = new EditText(this);
         search.setSingleLine(true);
         search.setHint("Recherche: sujet, lieu, source...");
-        search.setTextColor(INK);
-        search.setHintTextColor(MUTED);
+        search.setTextColor(inkColor);
+        search.setHintTextColor(mutedColor);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -273,7 +306,7 @@ public class MainActivity extends Activity {
         advancedFilters.addView(quickRow);
 
         advancedFilters.addView(twoColumnRow(field("Région", region), field("Source", source)));
-        advancedFilters.addView(twoColumnRow(field("Tri", sort), label("Les curseurs affinent la sélection publiée.", 12, Typeface.BOLD, MUTED)));
+        advancedFilters.addView(twoColumnRow(field("Tri", sort), label("Les curseurs affinent la sélection publiée.", 12, Typeface.BOLD, mutedColor)));
 
         period.setOnItemSelectedListener(listener(position -> {
             periodFilter = position == 1 ? "today" : position == 2 ? "7d" : position == 3 ? "all" : "24h";
@@ -292,24 +325,24 @@ public class MainActivity extends Activity {
             renderArticles();
         }));
 
-        tensionValue = label("10", 13, Typeface.BOLD, ACCENT);
+        tensionValue = label("10", 13, Typeface.BOLD, accentColor);
         tension = new SeekBar(this);
         tension.setMax(10);
         tension.setProgress(10);
-        tension.setProgressTintList(ColorStateList.valueOf(ACCENT));
-        tension.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        tension.setProgressTintList(ColorStateList.valueOf(accentColor));
+        tension.setThumbTintList(ColorStateList.valueOf(accentColor));
         tension.setOnSeekBarChangeListener(seekListener(value -> {
             maxTension = value;
             tensionValue.setText(String.valueOf(value));
             renderArticles();
         }));
 
-        priorityValue = label("0", 13, Typeface.BOLD, ACCENT);
+        priorityValue = label("0", 13, Typeface.BOLD, accentColor);
         priority = new SeekBar(this);
         priority.setMax(14);
         priority.setProgress(0);
-        priority.setProgressTintList(ColorStateList.valueOf(ACCENT));
-        priority.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        priority.setProgressTintList(ColorStateList.valueOf(accentColor));
+        priority.setThumbTintList(ColorStateList.valueOf(accentColor));
         priority.setOnSeekBarChangeListener(seekListener(value -> {
             minPriority = value * 10;
             priorityValue.setText(String.valueOf(minPriority));
@@ -420,7 +453,7 @@ public class MainActivity extends Activity {
         List<NewsArticle> filtered = filteredArticles();
         resultTitle.setText(filtered.size() + " actualité" + (filtered.size() > 1 ? "s" : ""));
         if (filtered.isEmpty()) {
-            TextView empty = label("Aucune actualité ne correspond aux filtres.", 15, Typeface.NORMAL, MUTED);
+            TextView empty = label("Aucune actualité ne correspond aux filtres.", 15, Typeface.NORMAL, mutedColor);
             empty.setPadding(dp(14), dp(18), dp(14), dp(18));
             list.addView(empty);
             return;
@@ -480,7 +513,7 @@ public class MainActivity extends Activity {
     }
 
     private View articleView(NewsArticle article) {
-        LinearLayout card = roundedPanel(PANEL, LINE);
+        LinearLayout card = roundedPanel(panelColor, lineColor);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match(), wrap());
@@ -488,7 +521,7 @@ public class MainActivity extends Activity {
         card.setLayoutParams(params);
         if (readIds.contains(article.id)) card.setAlpha(0.72f);
 
-        TextView title = label(article.title, 18, Typeface.BOLD, INK);
+        TextView title = label(article.title, 18, Typeface.BOLD, inkColor);
         title.setOnClickListener(v -> {
             setRead(article.id, true);
             if (!article.url.isEmpty()) startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(article.url)));
@@ -496,12 +529,12 @@ public class MainActivity extends Activity {
         card.addView(title);
 
         String meta = article.source + " - " + dateFormat.format(Instant.ofEpochMilli(Math.max(0, article.timestamp)));
-        TextView metaView = label(meta, 12, Typeface.BOLD, MUTED);
+        TextView metaView = label(meta, 12, Typeface.BOLD, mutedColor);
         LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(match(), wrap());
         metaParams.setMargins(0, dp(2), 0, 0);
         card.addView(metaView, metaParams);
 
-        TextView summary = label(article.summary, 14, Typeface.NORMAL, Color.rgb(70, 76, 84));
+        TextView summary = label(article.summary, 14, Typeface.NORMAL, summaryColor);
         LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(match(), wrap());
         summaryParams.setMargins(0, dp(8), 0, dp(8));
         card.addView(summary, summaryParams);
@@ -511,7 +544,7 @@ public class MainActivity extends Activity {
                 + (article.childFriendly ? "  enfants" : "") + (article.isSports ? "  sport" : ""),
             12,
             Typeface.BOLD,
-            ACCENT
+            accentColor
         );
         card.addView(tags);
 
@@ -618,7 +651,7 @@ public class MainActivity extends Activity {
     private LinearLayout field(String label, View input) {
         LinearLayout field = new LinearLayout(this);
         field.setOrientation(LinearLayout.VERTICAL);
-        field.addView(label(label, 12, Typeface.BOLD, MUTED));
+        field.addView(label(label, 12, Typeface.BOLD, mutedColor));
         field.addView(input, new LinearLayout.LayoutParams(match(), wrap()));
         return field;
     }
@@ -647,7 +680,7 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.addView(label(title, 12, Typeface.BOLD, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1));
+        row.addView(label(title, 12, Typeface.BOLD, mutedColor), new LinearLayout.LayoutParams(0, wrap(), 1));
         row.addView(value);
         wrap.addView(row);
         wrap.addView(seekBar, new LinearLayout.LayoutParams(match(), wrap()));
@@ -664,9 +697,30 @@ public class MainActivity extends Activity {
         List<String> values = new ArrayList<>();
         values.add(first);
         Collections.addAll(values, rest);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, values);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, values) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                return styleSpinnerText(super.getView(position, convertView, parent), false);
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                return styleSpinnerText(super.getDropDownView(position, convertView, parent), true);
+            }
+        };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
+    }
+
+    private View styleSpinnerText(View view, boolean dropdown) {
+        if (view instanceof TextView) {
+            TextView text = (TextView) view;
+            text.setTextColor(inkColor);
+            text.setTextSize(14);
+            text.setBackgroundColor(panelColor);
+            text.setPadding(dp(8), dropdown ? dp(12) : dp(8), dp(8), dropdown ? dp(12) : dp(8));
+        }
+        return view;
     }
 
     private AdapterView.OnItemSelectedListener listener(PositionCallback callback) {
@@ -691,10 +745,10 @@ public class MainActivity extends Activity {
     private CheckBox checkbox(String text, boolean checked) {
         CheckBox box = new CheckBox(this);
         box.setText(text);
-        box.setTextColor(INK);
+        box.setTextColor(inkColor);
         box.setTextSize(14);
         box.setChecked(checked);
-        box.setButtonTintList(ColorStateList.valueOf(ACCENT));
+        box.setButtonTintList(ColorStateList.valueOf(accentColor));
         box.setOnCheckedChangeListener((buttonView, isChecked) -> renderArticles());
         return box;
     }
@@ -705,14 +759,14 @@ public class MainActivity extends Activity {
         button.setText(text);
         button.setTextSize(14);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setTextColor(primary ? Color.WHITE : INK);
+        button.setTextColor(primary ? primaryButtonTextColor : inkColor);
         button.setMinHeight(dp(38));
         button.setMinimumHeight(dp(38));
         button.setPadding(dp(12), 0, dp(12), 0);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(primary ? ACCENT : SOFT);
+        bg.setColor(primary ? accentColor : softColor);
         bg.setCornerRadius(dp(8));
-        bg.setStroke(dp(1), primary ? ACCENT : LINE);
+        bg.setStroke(dp(1), primary ? accentColor : lineColor);
         button.setBackground(bg);
         return button;
     }
