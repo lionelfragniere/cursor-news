@@ -15,6 +15,7 @@ const state = {
     tension: 10,
     priority: 0,
     childOnly: false,
+    includeEnglish: false,
     hideSports: true,
     hideRead: true,
   },
@@ -36,6 +37,7 @@ const els = {
   priority: document.querySelector("#priority-filter"),
   priorityValue: document.querySelector("#priority-value"),
   child: document.querySelector("#child-filter"),
+  english: document.querySelector("#english-filter"),
   sports: document.querySelector("#sports-filter"),
   read: document.querySelector("#read-filter"),
   reset: document.querySelector("#reset-filters"),
@@ -108,6 +110,7 @@ function setupFilters(payload) {
     [els.tension, "input"],
     [els.priority, "input"],
     [els.child, "change"],
+    [els.english, "change"],
     [els.sports, "change"],
     [els.read, "change"],
   ];
@@ -125,6 +128,7 @@ function updateFromControls() {
     tension: Number(els.tension.value),
     priority: Number(els.priority.value),
     childOnly: els.child.checked,
+    includeEnglish: els.english.checked,
     hideSports: els.sports.checked,
     hideRead: els.read.checked,
   };
@@ -142,6 +146,7 @@ function resetFilters() {
   els.tension.value = "10";
   els.priority.value = "0";
   els.child.checked = false;
+  els.english.checked = false;
   els.sports.checked = true;
   els.read.checked = true;
   updateFromControls();
@@ -150,7 +155,7 @@ function resetFilters() {
 function filteredArticles() {
   const query = normalize(state.filters.query);
   const filtered = state.articles.filter((article) => {
-    if (article.region === "english" && state.filters.region !== "english") return false;
+    if (article.region === "english" && !state.filters.includeEnglish) return false;
     if (state.filters.region !== "all" && article.region !== state.filters.region) return false;
     if (!matchesDateRange(article)) return false;
     if (state.filters.source !== "all" && article.source_name !== state.filters.source) return false;
