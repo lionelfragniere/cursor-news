@@ -134,6 +134,7 @@ button {
   align-items: flex-end;
   flex-wrap: wrap;
   justify-content: flex-end;
+  max-width: 690px;
 }
 
 .access-btn {
@@ -212,7 +213,7 @@ summary:focus-visible {
 
 .transcript-band,
 .bulletins-drawer,
-.filters {
+.filters-drawer {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -280,11 +281,13 @@ summary:focus-visible {
   justify-content: space-between;
 }
 
-.bulletins-drawer {
+.bulletins-drawer,
+.filters-drawer {
   padding: 0;
 }
 
-.bulletins-drawer > summary {
+.bulletins-drawer > summary,
+.filters-drawer > summary {
   align-items: center;
   cursor: pointer;
   display: flex;
@@ -293,23 +296,38 @@ summary:focus-visible {
   padding: 13px 16px;
 }
 
-.bulletins-drawer > summary::-webkit-details-marker {
+.bulletins-drawer > summary::-webkit-details-marker,
+.filters-drawer > summary::-webkit-details-marker {
   display: none;
 }
 
-.bulletins-drawer > summary::after {
+.bulletins-drawer > summary::after,
+.filters-drawer > summary::after {
   color: var(--accent);
   content: "Afficher";
   font-size: 13px;
   font-weight: 700;
 }
 
-.bulletins-drawer[open] > summary {
+.bulletins-drawer[open] > summary,
+.filters-drawer[open] > summary {
   border-bottom: 1px solid var(--line);
 }
 
-.bulletins-drawer[open] > summary::after {
+.bulletins-drawer[open] > summary::after,
+.filters-drawer[open] > summary::after {
   content: "Masquer";
+}
+
+.header-bulletins {
+  flex-basis: min(520px, 100%);
+  margin-top: 0;
+  width: min(520px, 100%);
+}
+
+.header-bulletins .bulletin-grid {
+  max-height: 360px;
+  overflow: auto;
 }
 
 .bulletin-grid {
@@ -341,6 +359,7 @@ summary:focus-visible {
 .filters {
   display: grid;
   gap: 16px;
+  padding: 16px;
 }
 
 .search-row,

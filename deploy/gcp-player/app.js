@@ -29,9 +29,6 @@ const els = {
   status: document.querySelector("#data-status"),
   player: document.querySelector("#radio-player"),
   currentFlashLabel: document.querySelector("#current-flash-label"),
-  bulletinTitle: document.querySelector("#bulletin-title"),
-  bulletinSummary: document.querySelector("#bulletin-summary"),
-  bulletinTranscript: document.querySelector("#bulletin-transcript"),
   bulletinAudioLink: document.querySelector("#bulletin-audio-link"),
   bulletinGrid: document.querySelector("#bulletin-grid"),
   textSize: document.querySelector("#text-size-toggle"),
@@ -350,9 +347,6 @@ function renderManifest(manifest) {
   renderBulletinGrid(manifest?.bulletins_by_style || []);
   if (!current) {
     els.currentFlashLabel.textContent = "Audio indisponible";
-    els.bulletinTitle.textContent = "Aucun bulletin publié";
-    els.bulletinSummary.textContent = "";
-    els.bulletinTranscript.replaceChildren();
     return;
   }
   const audioUrl = `${current.audio_url}?v=${encodeURIComponent(manifest.generated_at || Date.now())}`;
@@ -361,19 +355,6 @@ function renderManifest(manifest) {
   }
   els.bulletinAudioLink.href = current.archive_audio_url || current.audio_url;
   els.currentFlashLabel.textContent = current.style || "Bulletin";
-  els.bulletinTitle.textContent = `${current.title} · ${current.style}`;
-  els.bulletinSummary.textContent = current.summary || "";
-  const paragraphs = (current.transcript || "")
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  els.bulletinTranscript.replaceChildren(
-    ...paragraphs.map((part) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = part;
-      return paragraph;
-    }),
-  );
 }
 
 function renderBulletinGrid(items) {

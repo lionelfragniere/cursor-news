@@ -40,94 +40,90 @@
             ></audio>
             <a id="bulletin-audio-link" href="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3">MP3</a>
           </div>
+          <details class="bulletins-drawer header-bulletins" aria-label="Bulletins audio par ton">
+            <summary>
+              <div>
+                <span class="eyebrow">Audio à la carte</span>
+                <strong>Écouter les derniers flashs par ton</strong>
+              </div>
+            </summary>
+            <div class="bulletin-grid" id="bulletin-grid"></div>
+          </details>
         </div>
       </header>
 
-      <details class="transcript-band current-flash-drawer" aria-label="Transcript du bulletin courant">
-        <summary class="transcript-head">
-          <div>
-            <p class="eyebrow">Bulletin courant</p>
-            <h2 id="bulletin-title">Chargement du bulletin</h2>
-          </div>
-        </summary>
-        <p class="summary" id="bulletin-summary"></p>
-        <article class="transcript" id="bulletin-transcript"></article>
-      </details>
-
-      <details class="bulletins-drawer" aria-label="Bulletins audio par ton">
+      <details class="filters-drawer" aria-label="Filtres des actualités">
         <summary>
           <div>
-            <span class="eyebrow">Audio à la carte</span>
-            <strong>Écouter les derniers flashs par ton</strong>
+            <span class="eyebrow">Filtres</span>
+            <strong>Affiner les news affichées</strong>
           </div>
         </summary>
-        <div class="bulletin-grid" id="bulletin-grid"></div>
+        <section class="filters">
+          <div class="search-row">
+            <label>
+              <span>Recherche</span>
+              <input id="search" type="search" placeholder="Sujet, lieu, source..." />
+            </label>
+            <label>
+              <span>Région</span>
+              <select id="region-filter"></select>
+            </label>
+            <label>
+              <span>Période</span>
+              <select id="date-filter">
+                <option value="today">Aujourd'hui</option>
+                <option value="24h" selected>24 dernières heures</option>
+                <option value="7d">7 derniers jours</option>
+                <option value="all">Tout l'historique</option>
+              </select>
+            </label>
+            <label>
+              <span>Source</span>
+              <select id="source-filter"></select>
+            </label>
+            <label>
+              <span>Tri</span>
+              <select id="sort-filter">
+                <option value="newest">Plus récent</option>
+                <option value="romand">Focus romand</option>
+                <option value="calm">Plus calme</option>
+                <option value="alert">Plus tendu</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="slider-row">
+            <label class="slider">
+              <span>Tension max <strong id="tension-value">10</strong></span>
+              <input id="tension-filter" type="range" min="0" max="10" value="10" />
+            </label>
+            <label class="slider">
+              <span>Focus romand <strong id="priority-value">0</strong></span>
+              <input id="priority-filter" type="range" min="0" max="140" step="10" value="0" />
+            </label>
+            <label class="toggle">
+              <input id="child-filter" type="checkbox" />
+              <span>Adapté enfants</span>
+            </label>
+            <label class="toggle">
+              <input id="sports-filter" type="checkbox" checked />
+              <span>Masquer sport</span>
+            </label>
+            <label class="toggle">
+              <input id="read-filter" type="checkbox" checked />
+              <span>Masquer lus</span>
+            </label>
+            <button id="reset-filters" type="button">Réinitialiser</button>
+          </div>
+        </section>
       </details>
-
-      <section class="filters" aria-label="Filtres des actualités">
-        <div class="search-row">
-          <label>
-            <span>Recherche</span>
-            <input id="search" type="search" placeholder="Sujet, lieu, source..." />
-          </label>
-          <label>
-            <span>Région</span>
-            <select id="region-filter"></select>
-          </label>
-          <label>
-            <span>Période</span>
-            <select id="date-filter">
-              <option value="today">Aujourd'hui</option>
-              <option value="24h" selected>24 dernières heures</option>
-              <option value="7d">7 derniers jours</option>
-              <option value="all">Tout l'historique</option>
-            </select>
-          </label>
-          <label>
-            <span>Source</span>
-            <select id="source-filter"></select>
-          </label>
-          <label>
-            <span>Tri</span>
-            <select id="sort-filter">
-              <option value="newest">Plus récent</option>
-              <option value="romand">Focus romand</option>
-              <option value="calm">Plus calme</option>
-              <option value="alert">Plus tendu</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="slider-row">
-          <label class="slider">
-            <span>Tension max <strong id="tension-value">10</strong></span>
-            <input id="tension-filter" type="range" min="0" max="10" value="10" />
-          </label>
-          <label class="slider">
-            <span>Focus romand <strong id="priority-value">0</strong></span>
-            <input id="priority-filter" type="range" min="0" max="140" step="10" value="0" />
-          </label>
-          <label class="toggle">
-            <input id="child-filter" type="checkbox" />
-            <span>Adapté enfants</span>
-          </label>
-          <label class="toggle">
-            <input id="sports-filter" type="checkbox" checked />
-            <span>Masquer sport</span>
-          </label>
-          <label class="toggle">
-            <input id="read-filter" type="checkbox" checked />
-            <span>Masquer lus</span>
-          </label>
-        </div>
-      </section>
 
       <section class="news-head">
         <div>
           <p class="eyebrow">News scrappées</p>
           <h2 id="result-title">Actualités</h2>
         </div>
-        <button id="reset-filters" type="button">Réinitialiser</button>
       </section>
 
       <section class="news-list" id="news-list" aria-live="polite"></section>
