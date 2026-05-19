@@ -1,1 +1,1 @@
-Première version mobile de Cursor News : actualités filtrables, flash audio, articles lus, mode clair/sombre et focus Suisse romande.
+Ajout du support Android Auto en mode média : lecture du flash en cours et des derniers flashs par ton depuis l'écran de la voiture.

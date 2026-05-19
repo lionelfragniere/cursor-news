@@ -60,7 +60,7 @@ Pour une version spécifique :
 
 ```cmd
 set ANDROID_VERSION_CODE=2
-set ANDROID_VERSION_NAME=0.1.1
+set ANDROID_VERSION_NAME=0.2.0
 scripts\build_android_release.cmd
 ```
 
@@ -81,6 +81,24 @@ Complète aussi :
 - accès aux fonctionnalités de l'app : aucun login requis.
 
 Suggestion Data Safety : l'app ne collecte pas de données personnelles directement. Elle stocke seulement les articles lus localement sur l'appareil.
+
+## Android Auto
+
+Depuis la version `0.2.0`, l'app déclare un support Android Auto en catégorie média. L'expérience voiture expose uniquement l'audio :
+
+- flash en cours ;
+- derniers flashs par ton ;
+- contrôles lecture/pause/stop via Android Auto.
+
+Dans Play Console, après upload du bundle :
+
+1. Aller dans `Configuration` > `Paramètres avancés` > `Facteurs de forme`.
+2. Activer `Android Auto` pour l'app.
+3. Accepter les conditions Android Auto / Android for Cars.
+4. Fournir les captures d'écran Android Auto si Play Console les demande.
+5. Soumettre la release à l'examen. Google vérifiera les règles de qualité voiture.
+
+Important : Android Auto ne doit pas afficher l'interface complète des articles et filtres pendant la conduite. Cursor News est donc exposée comme app média, pas comme app de lecture texte.
 
 ## 5. Activer l'automatisation API
 
@@ -108,7 +126,7 @@ Ne commit jamais cette clé.
 Après le premier upload manuel :
 
 ```cmd
-scripts\publish_android_internal.cmd 2 0.1.1
+scripts\publish_android_internal.cmd 2 0.2.0
 ```
 
 Cela publie le bundle sur le track `internal` par défaut et pousse aussi les textes de fiche Play Store inclus dans le repo.
@@ -119,14 +137,14 @@ Variables utiles :
 set PLAY_TRACK=internal
 set PLAY_RELEASE_STATUS=COMPLETED
 set ANDROID_VERSION_CODE=2
-set ANDROID_VERSION_NAME=0.1.1
+set ANDROID_VERSION_NAME=0.2.0
 ```
 
 Pour préparer sans rendre disponible aux testeurs :
 
 ```cmd
 set PLAY_RELEASE_STATUS=DRAFT
-scripts\publish_android_internal.cmd 2 0.1.1
+scripts\publish_android_internal.cmd 2 0.2.0
 ```
 
 ## Métadonnées incluses
