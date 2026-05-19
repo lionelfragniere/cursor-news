@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> None:
     site.add_argument("--output", default="deploy/gcp-player/news.json")
     site.add_argument("--limit", type=int, default=400)
     site.add_argument("--include-sports", action="store_true")
+    site.add_argument("--include-english", action="store_true")
 
     publish_gcp = sub.add_parser("publish-gcp")
     publish_gcp.add_argument("--news-limit", type=int, default=500)
@@ -140,7 +141,13 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "export-site-data":
         output_path = settings.home / args.output
-        payload = export_site_news(settings, output_path, limit=args.limit, include_sports=args.include_sports)
+        payload = export_site_news(
+            settings,
+            output_path,
+            limit=args.limit,
+            include_sports=args.include_sports,
+            include_english=args.include_english,
+        )
         print(f"Export site: {output_path}")
         print(f"Articles: {payload['count']}")
         return

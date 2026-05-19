@@ -87,8 +87,13 @@ function setRead(article, read) {
 function fillSelect(select, values, firstLabel) {
   select.replaceChildren(
     new Option(firstLabel, "all"),
-    ...values.map((value) => new Option(value, value)),
+    ...values.map((value) => new Option(displayFilterValue(value), value)),
   );
+}
+
+function displayFilterValue(value) {
+  if (value === "english") return "English / UN";
+  return value;
 }
 
 function setupFilters(payload) {
@@ -145,6 +150,7 @@ function resetFilters() {
 function filteredArticles() {
   const query = normalize(state.filters.query);
   const filtered = state.articles.filter((article) => {
+    if (article.region === "english" && state.filters.region !== "english") return false;
     if (state.filters.region !== "all" && article.region !== state.filters.region) return false;
     if (!matchesDateRange(article)) return false;
     if (state.filters.source !== "all" && article.source_name !== state.filters.source) return false;
@@ -154,7 +160,7 @@ function filteredArticles() {
     if (article.tension > state.filters.tension) return false;
     if (article.priority < state.filters.priority) return false;
     if (!query) return true;
-    const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region}`);
+    const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region} ${article.search_terms || ""}`);
     return haystack.includes(query);
   });
 
@@ -253,7 +259,7 @@ function renderArticle(article) {
   const tags = document.createElement("div");
   tags.className = "tags";
   tags.append(
-    tag(article.region),
+    tag(displayFilterValue(article.region)),
     tag(`tension ${article.tension}/10`, article.tension >= 4 ? "alert" : ""),
     tag(`focus ${article.priority}`),
   );
@@ -371,7 +377,7 @@ async function init() {
   try {
     const [manifestResponse, response] = await Promise.all([
       fetch(`${GCP_DATA_BASE_URL}/manifest.json?v=${Date.now()}`, { cache: "no-store" }),
-      fetch(`${GCP_DATA_BASE_URL}/news.json?v=${Date.now()}`, { cache: "no-store" }),
+      fetchNewsPayload(),
     ]);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     if (manifestResponse.ok) renderManifest(await manifestResponse.json());
@@ -385,6 +391,13 @@ async function init() {
     els.status.textContent = "News indisponibles";
     els.list.replaceChildren(emptyState());
   }
+}
+
+async function fetchNewsPayload() {
+  const cacheBust = Date.now();
+  const webResponse = await fetch(`${GCP_DATA_BASE_URL}/news-web.json?v=${cacheBust}`, { cache: "no-store" });
+  if (webResponse.ok) return webResponse;
+  return fetch(`${GCP_DATA_BASE_URL}/news.json?v=${cacheBust}`, { cache: "no-store" });
 }
 
 init();

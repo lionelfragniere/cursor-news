@@ -10,11 +10,22 @@ from .models import Article
 from .settings import Settings
 
 
-def export_site_news(settings: Settings, output_path: Path, limit: int = 400, include_sports: bool = False) -> dict:
+def export_site_news(
+    settings: Settings,
+    output_path: Path,
+    limit: int = 400,
+    include_sports: bool = False,
+    include_english: bool = False,
+) -> dict:
     db = Database(settings.database_path)
     db.init()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    articles = _export_articles(db, limit=max(1, limit), include_sports=include_sports)
+    articles = _export_articles(
+        db,
+        limit=max(1, limit),
+        include_sports=include_sports,
+        include_english=include_english,
+    )
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "count": len(articles),
@@ -26,8 +37,13 @@ def export_site_news(settings: Settings, output_path: Path, limit: int = 400, in
     return payload
 
 
-def _export_articles(db: Database, limit: int, include_sports: bool) -> list[dict]:
-    where = "" if include_sports else "WHERE a.is_sports = 0"
+def _export_articles(db: Database, limit: int, include_sports: bool, include_english: bool) -> list[dict]:
+    filters: list[str] = []
+    if not include_sports:
+        filters.append("a.is_sports = 0")
+    if not include_english:
+        filters.append("s.region != 'english'")
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
     with db.connect() as con:
         rows = con.execute(
             f"""
@@ -91,6 +107,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool) -> list[dic
                 "tension": tension,
                 "calm": calm,
                 "child_friendly": not child_unsuitable and not bool(row["is_sports"]),
+                "search_terms": _search_terms(article, str(row["region"] or "general")),
             }
         )
         if len(items) >= limit:
@@ -103,3 +120,12 @@ def _excerpt(text: str, max_length: int = 320) -> str:
     if len(clean) <= max_length:
         return clean
     return clean[:max_length].rsplit(" ", 1)[0] + "..."
+
+
+def _search_terms(article: Article, region: str) -> str:
+    if region != "english":
+        return ""
+    terms = ["english"]
+    if article.source_name.startswith("UN News"):
+        terms.extend(["UN", "ONU", "United Nations", "Nations Unies"])
+    return " ".join(terms)

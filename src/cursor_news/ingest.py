@@ -59,7 +59,7 @@ class FeedIngestor:
             article = self._entry_to_article(source, entry)
             if not article:
                 continue
-            if len(article.content) < 260 and article.url:
+            if source.region != "english" and len(article.content) < 260 and article.url:
                 article = self._enrich_article(client, article)
             _article_id, created = self.db.upsert_article(article)
             if created:

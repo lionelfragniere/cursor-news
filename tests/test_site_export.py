@@ -61,3 +61,42 @@ def test_export_site_news_deduplicates_same_story_across_sources(tmp_path: Path,
 
     assert payload["count"] == 1
     assert payload["articles"][0]["source_name"] == "RTN - Région"
+
+
+def test_export_site_news_keeps_english_web_only(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    settings = load_settings()
+    db = Database(settings.database_path)
+    db.init()
+    db.upsert_source(FeedSource(name="UN News", url="https://news.un.org/rss", region="english", priority=45))
+    db.upsert_source(FeedSource(name="RTN", url="https://example.test/rss", region="suisse-romande", priority=140))
+    db.upsert_article(
+        ArticleInput(
+            source_name="UN News",
+            title="UN Secretary-General calls for renewed diplomacy",
+            url="https://news.un.org/en/story/1",
+            published_at="2026-05-19T08:00:00+00:00",
+            summary="The United Nations Secretary-General called for renewed diplomatic efforts.",
+            content="",
+        )
+    )
+    db.upsert_article(
+        ArticleInput(
+            source_name="RTN",
+            title="Une actualité romande",
+            url="https://example.test/news",
+            published_at="2026-05-19T09:00:00+00:00",
+            summary="Une information locale.",
+            content="",
+        )
+    )
+
+    android_payload = export_site_news(settings, tmp_path / "android.json", limit=20)
+    web_payload = export_site_news(settings, tmp_path / "web.json", limit=20, include_english=True)
+
+    assert "english" not in android_payload["regions"]
+    assert "english" in web_payload["regions"]
+    assert [item["source_name"] for item in android_payload["articles"]] == ["RTN"]
+    assert {item["source_name"] for item in web_payload["articles"]} == {"RTN", "UN News"}

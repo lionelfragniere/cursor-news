@@ -83,3 +83,33 @@ def test_database_classifies_sports_and_keeps_archive(tmp_path: Path):
     assert status["archive"]["total"] == 2
     assert status["archive"]["sports"] == 1
     assert status["archive"]["editorial"] == 1
+
+
+def test_english_articles_are_excluded_from_bulletin_candidates(tmp_path: Path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource(name="UN News", url="https://news.un.org/rss", region="english", priority=45))
+    db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss", region="suisse-romande", priority=140))
+    db.upsert_article(
+        ArticleInput(
+            source_name="UN News",
+            title="Security Council discusses humanitarian access",
+            url="https://news.un.org/en/story/1",
+            published_at=None,
+            summary="A United Nations meeting focuses on access for aid workers.",
+            content="",
+        )
+    )
+    local_id, _ = db.upsert_article(
+        ArticleInput(
+            source_name="Fixture",
+            title="Une actualité locale reste candidate",
+            url="https://example.test/local",
+            published_at=None,
+            summary="Un sujet romand de société.",
+            content="",
+        )
+    )
+
+    assert [item.id for item in db.list_candidate_articles(10)] == [local_id]
+    assert [item.id for item in db.list_recent_articles(10)] == [local_id]

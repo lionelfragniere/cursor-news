@@ -255,6 +255,7 @@ class Database:
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.status = 'new'
                   AND a.is_sports = 0
+                  AND s.region != 'english'
                 ORDER BY s.priority DESC, COALESCE(a.published_at, a.created_at) DESC
                 LIMIT ?
                 """,
@@ -282,6 +283,7 @@ class Database:
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
+                  AND s.region != 'english'
                 ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.used_count ASC
                 LIMIT ?
                 """,

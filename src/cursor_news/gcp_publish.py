@@ -20,9 +20,11 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     export_dir = settings.data_dir / "site_publish"
     export_dir.mkdir(parents=True, exist_ok=True)
     news_path = export_dir / "news.json"
+    web_news_path = export_dir / "news-web.json"
     manifest_path = export_dir / "manifest.json"
 
     news_payload = export_site_news(settings, news_path, limit=news_limit, include_sports=False)
+    web_news_payload = export_site_news(settings, web_news_path, limit=news_limit, include_sports=False, include_english=True)
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
@@ -35,6 +37,14 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
             gcloud,
             news_path,
             f"{bucket.rstrip('/')}/current/news.json",
+            project=project,
+            content_type="application/json; charset=utf-8",
+            cache_control="public, max-age=60",
+        ),
+        _gcloud_cp(
+            gcloud,
+            web_news_path,
+            f"{bucket.rstrip('/')}/current/news-web.json",
             project=project,
             content_type="application/json; charset=utf-8",
             cache_control="public, max-age=60",
@@ -86,7 +96,9 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
                 cache_control="public, max-age=31536000, immutable",
             )
         )
-    messages.append(f"published {news_payload['count']} news to {public_base_url}")
+    messages.append(
+        f"published {news_payload['count']} android-safe news and {web_news_payload['count']} web news to {public_base_url}"
+    )
     return messages
 
 
