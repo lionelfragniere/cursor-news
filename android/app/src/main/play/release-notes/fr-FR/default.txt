@@ -1,0 +1,1 @@
+Première version mobile de Cursor News : actualités filtrables, flash audio, articles lus, mode clair/sombre et focus Suisse romande.

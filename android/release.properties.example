@@ -1,0 +1,4 @@
+storeFile=keystores/cursor-news-upload.jks
+storePassword=CHANGE_ME
+keyAlias=cursor-news-upload
+keyPassword=CHANGE_ME

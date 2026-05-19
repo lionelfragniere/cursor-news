@@ -24,5 +24,8 @@ server.err.log
 
 android/.gradle/
 android/local.properties
+android/release.properties
+android/play-service-account.json
+android/keystores/
 android/app/build/
 android/build/

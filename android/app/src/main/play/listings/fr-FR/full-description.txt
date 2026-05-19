@@ -1,0 +1,12 @@
+Cursor News rassemble des actualités francophones, avec un accent particulier sur la Suisse romande et la France.
+
+L'application permet de consulter les dernières nouvelles, d'écouter le flash audio en cours et de filtrer les articles par période, région, source, tension, focus romand ou lisibilité pour enfants.
+
+Fonctions principales :
+- fil d'actualité mis à jour régulièrement;
+- lecture du dernier flash audio;
+- recherche par mot clé;
+- filtres pour masquer les sports ou les articles déjà lus;
+- interface claire et sombre alignée avec les paramètres du téléphone.
+
+Cursor News ne demande pas de compte utilisateur. Les articles lus sont mémorisés localement sur l'appareil.

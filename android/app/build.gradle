@@ -1,6 +1,31 @@
 plugins {
     id "com.android.application"
+    id "com.github.triplet.play" version "3.13.0"
 }
+
+import com.github.triplet.gradle.androidpublisher.ReleaseStatus
+import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
+
+def releasePropsFile = rootProject.file("release.properties")
+def releaseProps = new Properties()
+if (releasePropsFile.exists()) {
+    releasePropsFile.withInputStream { releaseProps.load(it) }
+}
+
+def envOrProp = { envName, propName, fallback = null ->
+    def envValue = System.getenv(envName)
+    if (envValue != null && !envValue.trim().isEmpty()) {
+        return envValue.trim()
+    }
+    def propValue = releaseProps.getProperty(propName)
+    if (propValue != null && !propValue.trim().isEmpty()) {
+        return propValue.trim()
+    }
+    return fallback
+}
+
+def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+def androidVersionName = System.getenv("ANDROID_VERSION_NAME") ?: "0.1.0"
 
 android {
     namespace "li.fragniere.cursornews"
@@ -10,12 +35,44 @@ android {
         applicationId "li.fragniere.cursornews"
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName "0.1.0"
+        versionCode androidVersionCode
+        versionName androidVersionName
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        if (releasePropsFile.exists() || System.getenv("ANDROID_RELEASE_STORE_FILE")) {
+            release {
+                storeFile file(envOrProp("ANDROID_RELEASE_STORE_FILE", "storeFile"))
+                storePassword envOrProp("ANDROID_RELEASE_STORE_PASSWORD", "storePassword")
+                keyAlias envOrProp("ANDROID_RELEASE_KEY_ALIAS", "keyAlias", "cursor-news-upload")
+                keyPassword envOrProp("ANDROID_RELEASE_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (signingConfigs.findByName("release") != null) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+play {
+    track.set(System.getenv("PLAY_TRACK") ?: "internal")
+    releaseStatus.set(ReleaseStatus.valueOf((System.getenv("PLAY_RELEASE_STATUS") ?: "DRAFT").toUpperCase(Locale.ROOT)))
+    resolutionStrategy.set(ResolutionStrategy.AUTO)
+
+    def credentialsFile = rootProject.file("play-service-account.json")
+    if (credentialsFile.exists() && System.getenv("ANDROID_PUBLISHER_CREDENTIALS") == null) {
+        serviceAccountCredentials.set(credentialsFile)
     }
 }
