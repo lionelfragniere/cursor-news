@@ -21,3 +21,8 @@ models/
 deploy/gcp-player/news.json
 server.log
 server.err.log
+
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
