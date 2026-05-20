@@ -138,7 +138,10 @@ public class CursorNewsMediaService extends MediaBrowserService {
                     true
                 ));
             }
-            JSONArray bulletins = manifest.optJSONArray("bulletins_by_style");
+            JSONArray bulletins = manifest.optJSONArray("bulletins_by_topic");
+            if (bulletins == null) {
+                bulletins = manifest.optJSONArray("bulletins_by_style");
+            }
             if (bulletins != null) {
                 for (int index = 0; index < bulletins.length(); index++) {
                     JSONObject item = bulletins.optJSONObject(index);
@@ -164,7 +167,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
         HttpURLConnection connection = (HttpURLConnection) new URL(url + "?v=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(12000);
-        connection.setRequestProperty("User-Agent", "CursorNewsAndroidAuto/0.2");
+        connection.setRequestProperty("User-Agent", "CursorNewsAndroidAuto/0.5");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
             StringBuilder builder = new StringBuilder();
             String line;

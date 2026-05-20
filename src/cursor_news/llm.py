@@ -51,7 +51,7 @@ class TemplateLLMClient:
             return fallback_bulletin(style)
         opener = _template_opener(style)
         lines = [opener]
-        selected_articles = articles[:10]
+        selected_articles = articles[:12]
         for index, article in enumerate(selected_articles, start=1):
             text = article.summary or article.content or article.title
             text = " ".join(text.split())
@@ -258,6 +258,12 @@ def _template_opener(style: StyleSlot) -> str:
             return "Bonjour, vous écoutez Cursor News. Ce point suit les nouvelles importantes pour les Nations Unies, l'humanitaire, les droits humains, la paix et la sécurité."
         case "security_world":
             return "Bonjour, vous écoutez Cursor News. Voici le point sur la situation sécuritaire mondiale, avec prudence, contexte et faits vérifiés."
+        case key if key in {"suisse_romande", "valais", "suisse", "international", "un_relevant", "security_world"}:
+            return (
+                f"{transition}, {title}. "
+                f"{_sentence(excerpt)} "
+                "Ce qu'il faut retenir maintenant, c'est le lien entre les faits confirmés, les décisions attendues et les conséquences concrètes pour les prochains jours."
+            )
         case "pote":
             return "Salut, c'est Cursor News. On prend quelques minutes pour faire le tour des infos qui comptent, sans jargon et sans tourner autour du pot."
         case "non_anxiogene":
@@ -273,12 +279,13 @@ def _template_opener(style: StyleSlot) -> str:
 
 
 def _template_segment(style: StyleSlot, index: int, title: str, source: str, text: str) -> str:
-    excerpt = _word_limit(_clean_article_text(text, source), 78)
+    excerpt = _word_limit(_clean_article_text(text, source), 115)
     transition = _transition_for(index)
     if style.language == "en":
         return (
             f"{_english_transition_for(index)}, {title}. "
-            f"{_sentence(excerpt)}"
+            f"{_sentence(excerpt)} "
+            "For listeners following global affairs, the point to watch is how governments, international organizations and local communities respond over the next few hours."
         )
     match style.key:
         case "pote":

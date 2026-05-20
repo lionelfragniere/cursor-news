@@ -20,8 +20,8 @@ def envOrProp = { envName, propName, fallback = null ->
     return fallback
 }
 
-def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "4").toInteger()
-def androidVersionName = System.getenv("ANDROID_VERSION_NAME") ?: "0.4.0"
+def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "5").toInteger()
+def androidVersionName = System.getenv("ANDROID_VERSION_NAME") ?: "0.5.0"
 def playPublisherEnabled = project.hasProperty("enablePlayPublisher")
     || "1".equals(System.getenv("ENABLE_PLAY_PUBLISHER"))
 

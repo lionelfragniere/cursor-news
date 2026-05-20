@@ -152,8 +152,8 @@ class CursorNewsPipeline:
             self.settings.coqui_speaker,
             self.settings.home,
             self.settings.ffmpeg_path,
-            getattr(style, "tts_voice", None) or self.settings.edge_tts_voice,
-            self.settings.edge_tts_rate,
+            self._tts_voice_for_style(style),
+            self._tts_rate_for_style(style),
         )
         tts.synthesize_to_wav(draft.transcript, wav_path)
         encoder = AudioEncoder(
@@ -164,6 +164,19 @@ class CursorNewsPipeline:
             sample_rate=self.settings.audio_sample_rate,
         )
         return encoder.encode_for_web(wav_path, target_path, draft.title)
+
+    def _tts_voice_for_style(self, style) -> str:
+        configured_voice = getattr(style, "tts_voice", None)
+        if configured_voice:
+            return configured_voice
+        if getattr(style, "language", "fr") == "en":
+            return "en-US-JennyNeural"
+        return self.settings.edge_tts_voice
+
+    def _tts_rate_for_style(self, style) -> str:
+        if getattr(style, "language", "fr") == "en":
+            return "-2%"
+        return self.settings.edge_tts_rate
 
     def upload_dry_run(self) -> list[str]:
         current = self.db.current_bulletin()
