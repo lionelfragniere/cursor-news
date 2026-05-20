@@ -13,9 +13,20 @@ from .models import AudioResult
 
 
 class AudioEncoder:
-    def __init__(self, ffmpeg_path: str | None, allow_wav_fallback: bool = False):
+    def __init__(
+        self,
+        ffmpeg_path: str | None,
+        allow_wav_fallback: bool = False,
+        *,
+        bitrate: str = "64k",
+        channels: int = 1,
+        sample_rate: int = 44100,
+    ):
         self.ffmpeg_path = resolve_executable(ffmpeg_path, "ffmpeg")
         self.allow_wav_fallback = allow_wav_fallback
+        self.bitrate = bitrate
+        self.channels = channels
+        self.sample_rate = sample_rate
 
     def encode_for_web(self, wav_path: Path, output_path: Path, title: str) -> AudioResult:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -29,10 +40,12 @@ class AudioEncoder:
                     str(wav_path),
                     "-filter:a",
                     "loudnorm=I=-16:LRA=11:TP=-1.5",
+                    "-ac",
+                    str(self.channels),
                     "-ar",
-                    "44100",
+                    str(self.sample_rate),
                     "-b:a",
-                    "128k",
+                    self.bitrate,
                     str(mp3_path),
                 ],
                 check=True,

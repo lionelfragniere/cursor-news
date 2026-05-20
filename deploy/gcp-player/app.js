@@ -340,7 +340,7 @@ function dateRangeLabel() {
 
 function renderManifest(manifest) {
   const current = manifest?.current;
-  renderBulletinGrid(manifest?.bulletins_by_style || []);
+  renderBulletinGrid(manifest?.bulletins_by_topic || manifest?.bulletins_by_style || []);
   if (!current) {
     els.currentFlashLabel.textContent = "Audio indisponible";
     return;
@@ -358,7 +358,7 @@ function renderBulletinGrid(items) {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "Les bulletins par ton apparaîtront après les prochains cycles de génération.";
+    empty.textContent = "Les bulletins par sujet apparaîtront après les prochains cycles de génération.";
     els.bulletinGrid.replaceChildren(empty);
     return;
   }

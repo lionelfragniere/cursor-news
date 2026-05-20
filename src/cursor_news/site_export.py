@@ -81,6 +81,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool, include_eng
             summary=str(row["summary"] or ""),
             content=str(row["content"] or ""),
             priority=int(row["priority"]),
+            region=str(row["region"] or "general"),
         )
         key = story_key(article)
         if key in seen_stories:

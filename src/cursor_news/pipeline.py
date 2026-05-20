@@ -6,9 +6,10 @@ from pathlib import Path
 
 from .article_filter import (
     diversify_articles_by_topic,
+    filter_articles_for_topic,
     filter_child_unsuitable_articles,
     filter_sports_articles,
-    rank_articles_for_style,
+    rank_articles_for_topic,
     unique_articles_by_story,
     unique_articles_by_topic,
 )
@@ -58,6 +59,8 @@ class CursorNewsPipeline:
                 if self.db.bulletin_exists(slot_iso):
                     continue
                 generated.append(self.generate_slot(slot_start))
+                if len(generated) >= self.settings.generate_max_per_tick:
+                    break
             self.db.finish_run(run_id, "ok", f"{len(generated)} bulletins generated")
             return generated
         except Exception as exc:
@@ -73,7 +76,7 @@ class CursorNewsPipeline:
         bulletin_id = f"{slot_start.strftime('%Y%m%dT%H%M%S')}-{style.key}-{uuid.uuid4().hex[:8]}"
         self.db.create_bulletin(bulletin_id, slot_iso, style, draft, articles)
         try:
-            audio = self._render_audio(bulletin_id, draft)
+            audio = self._render_audio(bulletin_id, draft, style)
             self.db.mark_bulletin_ready(bulletin_id, audio)
         except Exception as exc:
             self.db.mark_bulletin_error(bulletin_id, str(exc))
@@ -82,18 +85,23 @@ class CursorNewsPipeline:
 
     def _select_articles(self, style_key: str | None = None) -> list[Article]:
         pool_size = max(self.settings.max_articles * 5, 30)
-        selected = filter_sports_articles(self.db.list_candidate_articles(pool_size))
+        include_english = style_key in {"un_relevant", "international_english", "security_world"}
+        if include_english or style_key in {"valais", "suisse_romande", "suisse", "international"}:
+            pool_size = max(self.settings.max_articles * 10, 120)
+        selected = filter_sports_articles(self.db.list_candidate_articles(pool_size, include_english=include_english))
         if style_key == "enfant":
             selected = filter_child_unsuitable_articles(selected)
+        ranking_style = "non_anxiogene" if style_key == "enfant" else style_key
+        selected = filter_articles_for_topic(selected, ranking_style, minimum=max(3, self.settings.max_articles // 3))
         if len(selected) < self.settings.max_articles:
             known_ids = {article.id for article in selected}
-            recent = filter_sports_articles(self.db.list_recent_articles(pool_size))
+            recent = filter_sports_articles(self.db.list_recent_articles(pool_size, include_english=include_english))
             if style_key == "enfant":
                 recent = filter_child_unsuitable_articles(recent)
+            recent = filter_articles_for_topic(recent, ranking_style, minimum=max(3, self.settings.max_articles // 3))
             recent = [article for article in recent if article.id not in known_ids]
             selected = [*selected, *recent]
-        ranking_style = "non_anxiogene" if style_key == "enfant" else style_key
-        selected = rank_articles_for_style(selected, ranking_style)
+        selected = rank_articles_for_topic(selected, ranking_style)
         selected = unique_articles_by_story(selected)
         selected = unique_articles_by_topic(selected) if style_key == "enfant" else diversify_articles_by_topic(selected)
         return selected[: self.settings.max_articles]
@@ -123,10 +131,11 @@ class CursorNewsPipeline:
                 transcript=draft.transcript,
                 warnings=[*draft.warnings, f"Fallback template après erreur LLM: {exc}"],
             )
-        draft = repair_bulletin_french_accents(draft)
-        return enforce_source_credit_at_end(draft, articles)
+        if getattr(style, "language", "fr") == "fr":
+            draft = repair_bulletin_french_accents(draft)
+        return enforce_source_credit_at_end(draft, articles, language=getattr(style, "language", "fr"))
 
-    def _render_audio(self, bulletin_id: str, draft: BulletinDraft):
+    def _render_audio(self, bulletin_id: str, draft: BulletinDraft, style):
         stem = _safe_stem(bulletin_id)
         wav_path = self.settings.audio_dir / f"{stem}.wav"
         target_path = self.settings.audio_dir / stem
@@ -138,11 +147,17 @@ class CursorNewsPipeline:
             self.settings.coqui_speaker,
             self.settings.home,
             self.settings.ffmpeg_path,
-            self.settings.edge_tts_voice,
+            getattr(style, "tts_voice", None) or self.settings.edge_tts_voice,
             self.settings.edge_tts_rate,
         )
         tts.synthesize_to_wav(draft.transcript, wav_path)
-        encoder = AudioEncoder(self.settings.ffmpeg_path, self.settings.allow_wav_fallback)
+        encoder = AudioEncoder(
+            self.settings.ffmpeg_path,
+            self.settings.allow_wav_fallback,
+            bitrate=self.settings.audio_bitrate,
+            channels=self.settings.audio_channels,
+            sample_rate=self.settings.audio_sample_rate,
+        )
         return encoder.encode_for_web(wav_path, target_path, draft.title)
 
     def upload_dry_run(self) -> list[str]:

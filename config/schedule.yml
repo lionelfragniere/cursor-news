@@ -1,31 +1,42 @@
 timezone: Europe/Zurich
-slot_minutes: 10
+slot_minutes: 60
 default_duration_minutes: 8
 target_words_min: 980
 target_words_max: 1240
 
-styles:
-  "00":
-    key: journaliste
-    label: Journaliste
-    prompt: "Ton de présentatrice radio professionnelle: clair, structuré, factuel, rythme posé. Priorise la Suisse romande, puis la Suisse, puis la France et l'international si le sujet est important pour le public romand."
-  "10":
-    key: pote
-    label: Pote
-    prompt: "Ton de pote bien informé: naturel, proche, un peu conversationnel, mais jamais approximatif. Explique comme à quelqu'un qu'on respecte, avec des repères suisses romands quand ils existent."
-  "20":
-    key: non_anxiogene
-    label: Non anxiogène
-    prompt: "Ton calme et rassurant: donne les faits sans dramatiser, contextualise les risques, mentionne les solutions, les garde-fous et ce qui est encore incertain. Privilégie les nouvelles utiles au quotidien en Suisse romande."
-  "30":
-    key: anxiogene
-    label: Anxiogène
-    prompt: "Ton plus tendu et urgent: souligne les risques, les signaux faibles et les conséquences possibles, sans exagérer ni inventer de faits. Reste accroché aux faits et donne la priorité aux alertes suisses romandes ou suisses."
-  "40":
-    key: enfant
-    label: Pour enfant
-    prompt: "Ton pour enfant de 8 à 12 ans: phrases courtes, mots simples, contenu adapté, pas de détails choquants. Explique concrètement ce que cela change pour des enfants ou des familles en Suisse romande."
-  "50":
-    key: contexte
-    label: Contexte / à suivre
-    prompt: "Ton de fin d'heure analytique et utile: donne du recul, relie les sujets entre eux, explique pourquoi ils comptent pour la Suisse romande, et termine par ce qu'il faudra surveiller dans les prochaines heures. Ne fais pas un simple récapitulatif."
+rotation:
+  - key: suisse_romande
+    label: Suisse romande
+    language: fr
+    prompt: "Bulletin centré Suisse romande: priorise Vaud, Genève, Fribourg, Neuchâtel, Jura, Berne francophone et les sujets romands qui touchent la vie publique, la santé, l'économie, les transports, l'éducation, l'environnement et la culture."
+
+  - key: valais
+    label: Valais
+    language: fr
+    prompt: "Bulletin centré Valais: priorise Sion, Martigny, Sierre, Monthey, le Chablais valaisan, le Haut-Valais, les communes, le canton, l'économie locale, les infrastructures, la montagne, le climat, la santé, l'énergie et la vie publique valaisanne."
+
+  - key: suisse
+    label: Suisse
+    language: fr
+    prompt: "Bulletin national suisse: explique les décisions fédérales, les cantons, l'économie, la santé, la sécurité, la recherche et les sujets qui peuvent influencer la Suisse romande."
+
+  - key: international
+    label: International
+    language: fr
+    prompt: "Bulletin international en français: sélectionne les grands faits mondiaux vraiment utiles à comprendre depuis la Suisse romande. Donne du contexte sans noyer l'auditeur dans les détails."
+
+  - key: un_relevant
+    label: ONU / Nations Unies
+    language: fr
+    prompt: "Bulletin utile pour une personne intéressée par l'ONU: relie les informations aux Nations Unies, à l'aide humanitaire, aux droits humains, à la santé mondiale, aux réfugiés, au climat, à la paix, à la sécurité et à la diplomatie multilatérale."
+
+  - key: international_english
+    label: International English
+    language: en
+    tts_voice: en-US-JennyNeural
+    prompt: "English-language international briefing: focus on major global developments, United Nations relevance when present, diplomacy, humanitarian issues, economics, science, climate and public safety. Keep it clear, spoken and non-sensational."
+
+  - key: security_world
+    label: Situation sécuritaire mondiale
+    language: fr
+    prompt: "Bulletin de sécurité mondiale: couvre conflits, crises humanitaires, cybermenaces, terrorisme, tensions militaires, sécurité civile et risques géopolitiques. Reste factuel, prudent, proportionné et utile."

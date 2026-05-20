@@ -31,6 +31,7 @@ class Settings:
     host: str
     port: int
     buffer_slots: int
+    generate_max_per_tick: int
     max_articles: int
     ingest_interval_minutes: int
     generate_interval_seconds: int
@@ -47,6 +48,9 @@ class Settings:
     coqui_speaker: str | None
     ffmpeg_path: str | None
     allow_wav_fallback: bool
+    audio_bitrate: str
+    audio_channels: int
+    audio_sample_rate: int
     infomaniak_dry_run: bool
     infomaniak_api_base: str
     infomaniak_token: str | None
@@ -67,6 +71,7 @@ class Settings:
     gcp_bucket: str | None
     gcloud_path: str
     gcp_public_base_url: str | None
+    gcp_bulletin_retention_hours: int
 
     @property
     def sources_path(self) -> Path:
@@ -113,6 +118,7 @@ def load_settings() -> Settings:
         host=os.getenv("CURSOR_NEWS_HOST", "0.0.0.0"),
         port=int(os.getenv("CURSOR_NEWS_PORT", "8000")),
         buffer_slots=max(1, int(os.getenv("CURSOR_NEWS_BUFFER_SLOTS", "2"))),
+        generate_max_per_tick=max(1, int(os.getenv("CURSOR_NEWS_GENERATE_MAX_PER_TICK", "1"))),
         max_articles=max(1, int(os.getenv("CURSOR_NEWS_MAX_ARTICLES", "12"))),
         ingest_interval_minutes=max(1, int(os.getenv("CURSOR_NEWS_INGEST_INTERVAL_MINUTES", "5"))),
         generate_interval_seconds=max(10, int(os.getenv("CURSOR_NEWS_GENERATE_INTERVAL_SECONDS", "60"))),
@@ -129,6 +135,9 @@ def load_settings() -> Settings:
         coqui_speaker=os.getenv("COQUI_SPEAKER") or None,
         ffmpeg_path=_resolve_optional_path(home, os.getenv("FFMPEG_PATH")),
         allow_wav_fallback=_as_bool(os.getenv("ALLOW_WAV_FALLBACK"), False),
+        audio_bitrate=os.getenv("AUDIO_BITRATE", "64k"),
+        audio_channels=max(1, int(os.getenv("AUDIO_CHANNELS", "1"))),
+        audio_sample_rate=max(8000, int(os.getenv("AUDIO_SAMPLE_RATE", "44100"))),
         infomaniak_dry_run=_as_bool(os.getenv("INFOMANIAK_DRY_RUN"), True),
         infomaniak_api_base=os.getenv("INFOMANIAK_API_BASE", "https://api.infomaniak.com").rstrip("/"),
         infomaniak_token=os.getenv("INFOMANIAK_TOKEN") or None,
@@ -148,12 +157,13 @@ def load_settings() -> Settings:
         infomaniak_stream_mount=os.getenv("INFOMANIAK_STREAM_MOUNT") or None,
         infomaniak_stream_username=os.getenv("INFOMANIAK_STREAM_USERNAME", "source"),
         infomaniak_stream_password=os.getenv("INFOMANIAK_STREAM_PASSWORD") or None,
-        infomaniak_stream_bitrate=os.getenv("INFOMANIAK_STREAM_BITRATE", "128k"),
+        infomaniak_stream_bitrate=os.getenv("INFOMANIAK_STREAM_BITRATE", "64k"),
         infomaniak_stream_sample_rate=int(os.getenv("INFOMANIAK_STREAM_SAMPLE_RATE", "44100")),
         gcp_project_id=os.getenv("GCP_PROJECT_ID") or None,
         gcp_bucket=os.getenv("GCP_BUCKET") or None,
         gcloud_path=os.getenv("GCLOUD_PATH", "gcloud"),
         gcp_public_base_url=os.getenv("GCP_PUBLIC_BASE_URL") or None,
+        gcp_bulletin_retention_hours=max(1, int(os.getenv("GCP_BULLETIN_RETENTION_HOURS", "2"))),
     )
 
     settings.ensure_dirs()

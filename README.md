@@ -1,6 +1,6 @@
 # Cursor News
 
-Prototype local de web-radio d'actualites automatisee. La v1 collecte des flux RSS, stocke les articles dans SQLite, genere des bulletins avec un LLM local, produit de l'audio via Coqui TTS, puis sert une interface LAN avec lecteur et transcript.
+Prototype local et serveur de web-radio d'actualites automatisee. Cursor News collecte des flux RSS, stocke les articles dans SQLite, genere des bulletins thematiques avec un LLM local, produit de l'audio parle, puis publie l'interface web et les MP3 vers GCP.
 
 ## Demarrage rapide Windows
 
@@ -33,7 +33,7 @@ bash scripts/run_tick_ubuntu.sh
 bash scripts/install_systemd_ubuntu.sh
 ```
 
-Le timer systemd lance un cycle complet a `00, 10, 20, 30, 40, 50` de chaque heure et publie l'audio, le manifest et les news vers GCP. Le guide complet est dans `UBUNTU_SERVER_SETUP.md`.
+Le timer systemd lance un cycle complet chaque heure. La rotation de bulletins est thematique: Suisse romande, Valais, Suisse, International, ONU/Nations Unies, International English et Situation securitaire mondiale. Les MP3 sont encodes en mono 64 kbps et l'archive GCP ne garde que les bulletins recents. Le guide complet est dans `UBUNTU_SERVER_SETUP.md`.
 
 ## Commandes utiles
 

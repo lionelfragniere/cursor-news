@@ -37,13 +37,21 @@ class Article:
     summary: str
     content: str
     priority: int = 50
+    region: str = "general"
 
     def prompt_text(self) -> str:
         body = self.content or self.summary
         body = " ".join(body.split())
         if len(body) > 800:
             body = body[:800].rsplit(" ", 1)[0] + "..."
-        return f"- Source: {self.source_name}\n  Titre: {self.title}\n  URL: {self.url}\n  Date: {self.published_at or 'inconnue'}\n  Contenu: {body}"
+        return (
+            f"- Source: {self.source_name}\n"
+            f"  Région/langue: {self.region}\n"
+            f"  Titre: {self.title}\n"
+            f"  URL: {self.url}\n"
+            f"  Date: {self.published_at or 'inconnue'}\n"
+            f"  Contenu: {body}"
+        )
 
 
 @dataclass(frozen=True)
@@ -51,6 +59,8 @@ class StyleSlot:
     key: str
     label: str
     prompt: str
+    language: str = "fr"
+    tts_voice: str | None = None
 
 
 @dataclass(frozen=True)

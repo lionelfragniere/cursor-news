@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .database import Database
@@ -28,9 +28,14 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
-    bulletins_by_style = latest_bulletins_by_style(db.bulletin_history(limit=60))
-    manifest = build_manifest(current, public_base_url, bulletins_by_style)
+    bulletins_by_topic = recent_bulletins_by_topic(
+        db.bulletin_history(limit=120),
+        retention_hours=settings.gcp_bulletin_retention_hours,
+    )
+    manifest = build_manifest(current, public_base_url, bulletins_by_topic)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    state_path = export_dir / "publish-state.json"
+    publish_state = _load_publish_state(state_path)
 
     messages = [
         _gcloud_cp(
@@ -59,43 +64,46 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
         ),
     ]
 
+    bucket_root = bucket.rstrip("/")
+    uploaded_ids: set[str] = set()
     if current and current.get("audio_path"):
         audio_path = Path(str(current["audio_path"]))
         if audio_path.exists():
-            messages.append(
-                _gcloud_cp(
-                    gcloud,
-                    audio_path,
-                    f"{bucket.rstrip('/')}/current/live.mp3",
-                    project=project,
-                    content_type="audio/mpeg",
-                    cache_control="public, max-age=30",
+            if publish_state.get("current_live_id") == current["id"]:
+                messages.append(f"skipped live.mp3, unchanged current bulletin {current['id']}")
+            else:
+                messages.append(
+                    _gcloud_cp(
+                        gcloud,
+                        audio_path,
+                        f"{bucket_root}/current/live.mp3",
+                        project=project,
+                        content_type="audio/mpeg",
+                        cache_control="public, max-age=30",
+                    )
                 )
-            )
+                publish_state["current_live_id"] = current["id"]
             messages.append(
-                _gcloud_cp(
-                    gcloud,
-                    audio_path,
-                    f"{bucket.rstrip('/')}/bulletins/{current['id']}.mp3",
-                    project=project,
-                    content_type="audio/mpeg",
-                    cache_control="public, max-age=31536000, immutable",
-                )
+                _upload_bulletin_if_needed(gcloud, bucket_root, current, project=project, state=publish_state)
             )
-    for bulletin in bulletins_by_style:
+            uploaded_ids.add(str(current["id"]))
+    for bulletin in bulletins_by_topic:
+        if str(bulletin.get("id")) in uploaded_ids:
+            continue
         audio_path = Path(str(bulletin.get("audio_path") or ""))
         if not audio_path.exists():
             continue
-        messages.append(
-            _gcloud_cp(
-                gcloud,
-                audio_path,
-                f"{bucket.rstrip('/')}/bulletins/{bulletin['id']}.mp3",
-                project=project,
-                content_type="audio/mpeg",
-                cache_control="public, max-age=31536000, immutable",
-            )
-        )
+        messages.append(_upload_bulletin_if_needed(gcloud, bucket_root, bulletin, project=project, state=publish_state))
+        uploaded_ids.add(str(bulletin["id"]))
+    keep_ids = {str(item.get("id")) for item in bulletins_by_topic if item.get("id")}
+    if current and current.get("id"):
+        keep_ids.add(str(current["id"]))
+    messages.extend(_delete_stale_bulletins(gcloud, bucket_root, keep_ids, project=project))
+    publish_state["uploaded_bulletins"] = sorted(
+        bulletin_id for bulletin_id in (publish_state.get("uploaded_bulletins") or []) if bulletin_id in keep_ids
+    )
+    publish_state["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    _save_publish_state(state_path, publish_state)
     messages.append(
         f"published {news_payload['count']} android-safe news and {web_news_payload['count']} web news to {public_base_url}"
     )
@@ -128,6 +136,10 @@ def configure_gcp_bucket_cors(settings: Settings) -> list[str]:
 
 
 def latest_bulletins_by_style(history: list[dict], limit: int = 6) -> list[dict]:
+    return latest_bulletins_by_topic(history, limit=limit)
+
+
+def latest_bulletins_by_topic(history: list[dict], limit: int = 6) -> list[dict]:
     selected: list[dict] = []
     seen: set[str] = set()
     for item in history:
@@ -143,17 +155,40 @@ def latest_bulletins_by_style(history: list[dict], limit: int = 6) -> list[dict]
     return selected
 
 
-def build_manifest(current: dict | None, public_base_url: str, bulletins_by_style: list[dict] | None = None) -> dict:
+def recent_bulletins_by_topic(
+    history: list[dict],
+    retention_hours: int = 2,
+    now: datetime | None = None,
+    limit: int = 24,
+) -> list[dict]:
+    current = now or datetime.now(timezone.utc)
+    cutoff = current - timedelta(hours=retention_hours)
+    recent = []
+    for item in history:
+        slot_start = _parse_datetime(str(item.get("slot_start") or ""))
+        if not slot_start or slot_start < cutoff:
+            continue
+        recent.append(item)
+    return latest_bulletins_by_topic(recent, limit=limit)
+
+
+def build_manifest(current: dict | None, public_base_url: str, bulletins_by_topic: list[dict] | None = None) -> dict:
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     bulletins = [
         _manifest_bulletin_item(item, public_base_url)
-        for item in (bulletins_by_style or [])
+        for item in (bulletins_by_topic or [])
     ]
     if not current:
-        return {"generated_at": generated_at, "current": None, "bulletins_by_style": bulletins}
+        return {
+            "generated_at": generated_at,
+            "current": None,
+            "bulletins_by_topic": bulletins,
+            "bulletins_by_style": bulletins,
+        }
     return {
         "generated_at": generated_at,
         "current": _manifest_bulletin_item(current, public_base_url, current_audio=True),
+        "bulletins_by_topic": bulletins,
         "bulletins_by_style": bulletins,
     }
 
@@ -206,6 +241,94 @@ def _gcloud_cp(
         command.extend(["--project", project])
     _run(command)
     return f"uploaded {source.name} -> {destination}"
+
+
+def _upload_bulletin_if_needed(
+    gcloud: str,
+    bucket_root: str,
+    bulletin: dict,
+    *,
+    project: str | None,
+    state: dict,
+) -> str:
+    bulletin_id = str(bulletin["id"])
+    destination = f"{bucket_root}/bulletins/{bulletin_id}.mp3"
+    uploaded = set(state.get("uploaded_bulletins") or [])
+    if bulletin_id in uploaded and _gcloud_exists(gcloud, destination, project=project):
+        return f"skipped existing bulletin {bulletin_id}"
+    message = _gcloud_cp(
+        gcloud,
+        Path(str(bulletin["audio_path"])),
+        destination,
+        project=project,
+        content_type="audio/mpeg",
+        cache_control="public, max-age=600",
+    )
+    uploaded.add(bulletin_id)
+    state["uploaded_bulletins"] = sorted(uploaded)
+    return message
+
+
+def _delete_stale_bulletins(gcloud: str, bucket_root: str, keep_ids: set[str], *, project: str | None) -> list[str]:
+    messages: list[str] = []
+    for bulletin_id in _remote_bulletin_ids(gcloud, bucket_root, project=project):
+        if bulletin_id in keep_ids:
+            continue
+        destination = f"{bucket_root}/bulletins/{bulletin_id}.mp3"
+        _gcloud_rm(gcloud, destination, project=project)
+        messages.append(f"deleted stale bulletin {bulletin_id}")
+    return messages
+
+
+def _remote_bulletin_ids(gcloud: str, bucket_root: str, *, project: str | None) -> set[str]:
+    command = [gcloud, "storage", "ls", f"{bucket_root}/bulletins/*.mp3"]
+    if project:
+        command.extend(["--project", project])
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        return set()
+    ids: set[str] = set()
+    for line in result.stdout.splitlines():
+        name = line.rstrip("/").rsplit("/", 1)[-1]
+        if name.endswith(".mp3"):
+            ids.add(name[:-4])
+    return ids
+
+
+def _gcloud_exists(gcloud: str, destination: str, *, project: str | None) -> bool:
+    command = [gcloud, "storage", "ls", destination]
+    if project:
+        command.extend(["--project", project])
+    result = subprocess.run(command, capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def _gcloud_rm(gcloud: str, destination: str, *, project: str | None) -> None:
+    command = [gcloud, "storage", "rm", destination]
+    if project:
+        command.extend(["--project", project])
+    _run(command)
+
+
+def _load_publish_state(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"uploaded_bulletins": []}
+
+
+def _save_publish_state(path: Path, state: dict) -> None:
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _parse_datetime(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _resolve_gcloud(value: str) -> str:

@@ -4,6 +4,16 @@ defaults:
   enabled: true
 
 sources:
+  - name: Canal9 - Actualités
+    url: https://canal9.ch/feed/
+    region: valais
+    priority: 150
+
+  - name: Antenne Région Valais romand
+    url: https://www.valaisromand.com/rss/rss.php?lang=FR
+    region: valais
+    priority: 148
+
   - name: RTN - Région
     url: https://www.rtn.ch/documents.rdf?cid=9670&idz=33
     region: suisse-romande

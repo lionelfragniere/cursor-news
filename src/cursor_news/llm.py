@@ -54,11 +54,15 @@ class TemplateLLMClient:
             text = " ".join(text.split())
             lines.append(_template_segment(style, index, article.title, article.source_name, text))
         lines.append(_template_closer(style))
-        lines.append(_source_credit(selected_articles))
+        lines.append(_source_credit(selected_articles, language=style.language))
         transcript = "\n\n".join(lines)
         return BulletinDraft(
             title=f"Cursor News - {style.label}",
-            summary=f"{len(articles)} articles résumés localement.",
+            summary=(
+                f"{len(articles)} articles summarized locally."
+                if style.language == "en"
+                else f"{len(articles)} articles résumés localement."
+            ),
             transcript=transcript,
             warnings=["Sortie générée par le moteur template, sans LLM."],
         )
@@ -124,15 +128,16 @@ def repair_bulletin_french_accents(draft: BulletinDraft) -> BulletinDraft:
     )
 
 
-def enforce_source_credit_at_end(draft: BulletinDraft, articles: list[Article]) -> BulletinDraft:
+def enforce_source_credit_at_end(draft: BulletinDraft, articles: list[Article], language: str = "fr") -> BulletinDraft:
     transcript = draft.transcript.strip()
     for article in articles:
         transcript = _remove_source_references(transcript, article.source_name, preserve_newlines=True)
     transcript = re.sub(r"\n*\s*Sources utilisées pour cette édition\s*:.*$", "", transcript, flags=re.S)
+    transcript = re.sub(r"\n*\s*Sources used for this edition\s*:.*$", "", transcript, flags=re.S | re.I)
     transcript = _remove_meta_fillers(transcript)
     transcript = _format_body_paragraphs(transcript)
     if articles:
-        transcript = f"{transcript}\n\n{_source_credit(articles)}"
+        transcript = f"{transcript}\n\n{_source_credit(articles, language=language)}"
     return BulletinDraft(
         title=draft.title,
         summary=draft.summary,
@@ -143,12 +148,23 @@ def enforce_source_credit_at_end(draft: BulletinDraft, articles: list[Article]) 
 
 def build_prompt(articles: list[Article], style: StyleSlot, slot_start: datetime) -> str:
     article_block = "\n\n".join(article.prompt_text() for article in articles)
+    language = getattr(style, "language", "fr")
+    if language == "en":
+        language_instruction = (
+            "Final language: English. Write the title, summary and transcript in fluent radio English, "
+            "even if some source metadata is in French."
+        )
+        source_credit_form = "Sources used for this edition: ..."
+    else:
+        language_instruction = "Langue finale: français. Écris le titre, le résumé et le transcript en français naturel."
+        source_credit_form = "Sources utilisées pour cette édition: ..."
     return f"""
 Tu es la rédaction de Cursor News, une web-radio d'actualités en français pour la Suisse romande et la France.
 
 Créneau: {slot_start.isoformat()}
-Style: {style.label}
-Consigne de ton: {style.prompt}
+Sujet: {style.label}
+Langue: {language_instruction}
+Consigne éditoriale: {style.prompt}
 
 Objectif:
 - Écrire un bulletin radio d'environ 8 minutes, environ 980 à 1240 mots.
@@ -156,19 +172,18 @@ Objectif:
 - Développer chaque sujet en 70 à 100 mots pour éviter un bulletin trop court.
 - Ne pas inventer de faits absents des sources.
 - Ne pas citer les sources au milieu des sujets: pas de "selon Franceinfo", pas de "source:", pas de nom de média dans chaque transition.
-- Regrouper les crédits de sources uniquement dans la toute dernière phrase, sous la forme: "Sources utilisées pour cette édition: ...".
+- Regrouper les crédits de sources uniquement dans la toute dernière phrase, sous la forme: "{source_credit_form}".
 - Garder une diction naturelle pour une synthèse vocale.
 - Distinguer clairement les faits confirmés et les incertitudes.
-- Adapter le style au ton demandé sans changer les faits.
+- Adapter le bulletin au sujet demandé sans changer les faits.
 - Écrire comme un vrai bulletin radio fluide, pas comme une liste mécanique.
 - Exclure les sujets strictement sportifs: résultats, matches, transferts, changements d'entraîneur, nominations de coach, compétitions et classements.
 - Éviter les phrases de remplissage ou d'explication méta comme "dit simplement", "il y a une situation à comprendre", "à ce stade l'important est", ou "l'enjeu maintenant".
 - Structurer le transcript en paragraphes courts séparés par une ligne vide: introduction, puis un paragraphe par sujet, puis conclusion.
 - Ne pas écrire "Point 1", "Sujet 1", "Alerte 1" ou d'autre numérotation visible.
-- Si le style est "Pour enfant", adapter le contenu lui-même: phrases courtes, mots simples, contexte clair, pas de détails violents ou de chiffres anxiogènes en série, et expliquer les sujets compliqués sans infantiliser.
-- Pour le style "Pour enfant", ne remplace jamais un sujet concret par une catégorie vague: il faut nommer le lieu, la personne, l'événement ou l'institution quand ils sont dans l'article.
-- Pour le style "Pour enfant", bannis les phrases génériques comme "une nouvelle arrive du monde de la culture", "des responsables politiques prennent des décisions" ou "il y a une situation à comprendre".
-- Pour le style "Contexte / à suivre", ne répète pas simplement les titres: explique les liens, les conséquences possibles, les angles morts et les points à vérifier ensuite.
+- Le bulletin doit rester centré sur le sujet "{style.label}". Si un article est hors sujet, ignore-le plutôt que de diluer le flash.
+- Pour les sujets ONU, relie les faits aux agences, droits humains, aide humanitaire, paix et sécurité ou diplomatie multilatérale quand c'est pertinent.
+- Pour la situation sécuritaire mondiale, couvre les conflits, crises, cybermenaces et risques géopolitiques sans sensationnalisme.
 
 Articles disponibles:
 {article_block}
@@ -198,6 +213,17 @@ def parse_json_object(raw: str) -> dict:
 
 
 def fallback_bulletin(style: StyleSlot) -> BulletinDraft:
+    if style.language == "en":
+        return BulletinDraft(
+            title=f"Cursor News - waiting for {style.label}",
+            summary="No reliable new item is available for this slot.",
+            transcript=(
+                "You are listening to Cursor News. For this slot, no reliable source item is ready yet. "
+                "The automatic newsroom keeps monitoring the feeds and will return with a new edition "
+                "as soon as verified information is available."
+            ),
+            warnings=["Fallback without a new article."],
+        )
     transcript = (
         "Vous écoutez Cursor News. Pour ce créneau, aucune nouvelle source exploitable "
         "n'a été détectée. La rédaction automatique continue de surveiller les flux RSS "
@@ -212,7 +238,21 @@ def fallback_bulletin(style: StyleSlot) -> BulletinDraft:
 
 
 def _template_opener(style: StyleSlot) -> str:
+    if style.language == "en":
+        return "You are listening to Cursor News. Here is the international briefing in English, with the facts, the context, and what to watch next."
     match style.key:
+        case "suisse_romande":
+            return "Bonjour, vous écoutez Cursor News. Voici le point sur les informations qui comptent en Suisse romande, avec les faits utiles et le contexte local."
+        case "valais":
+            return "Bonjour, vous écoutez Cursor News. Ce bulletin se concentre sur le Valais, ses communes, ses institutions et les sujets qui touchent directement la région."
+        case "suisse":
+            return "Bonjour, vous écoutez Cursor News. Voici le tour d'horizon suisse, des décisions fédérales aux sujets qui peuvent peser sur la vie quotidienne."
+        case "international":
+            return "Bonjour, vous écoutez Cursor News. On prend maintenant de la hauteur avec les principales nouvelles internationales à suivre depuis la Suisse romande."
+        case "un_relevant":
+            return "Bonjour, vous écoutez Cursor News. Ce point suit les nouvelles importantes pour les Nations Unies, l'humanitaire, les droits humains, la paix et la sécurité."
+        case "security_world":
+            return "Bonjour, vous écoutez Cursor News. Voici le point sur la situation sécuritaire mondiale, avec prudence, contexte et faits vérifiés."
         case "pote":
             return "Salut, c'est Cursor News. On prend quelques minutes pour faire le tour des infos qui comptent, sans jargon et sans tourner autour du pot."
         case "non_anxiogene":
@@ -230,6 +270,11 @@ def _template_opener(style: StyleSlot) -> str:
 def _template_segment(style: StyleSlot, index: int, title: str, source: str, text: str) -> str:
     excerpt = _word_limit(_clean_article_text(text, source), 78)
     transition = _transition_for(index)
+    if style.language == "en":
+        return (
+            f"{_english_transition_for(index)}, {title}. "
+            f"{_sentence(excerpt)}"
+        )
     match style.key:
         case "pote":
             return (
@@ -262,7 +307,13 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
 
 
 def _template_closer(style: StyleSlot) -> str:
+    if style.language == "en":
+        return "That is the end of this Cursor News briefing. We will keep following the verified updates for the next edition."
     match style.key:
+        case "suisse_romande" | "valais" | "suisse":
+            return "C'est la fin de ce bulletin. Cursor News continue de suivre ces dossiers et revient avec les prochains éléments confirmés."
+        case "international" | "un_relevant" | "security_world":
+            return "C'est la fin de ce point. Cursor News garde ces dossiers ouverts et reviendra avec les développements confirmés."
         case "pote":
             return "Voilà pour ce tour d'horizon. On garde l'oeil ouvert, et on se retrouve au prochain bulletin Cursor News."
         case "non_anxiogene":
@@ -293,11 +344,29 @@ def _transition_for(index: int) -> str:
     return transitions[min(index, len(transitions)) - 1]
 
 
-def _source_credit(articles: list[Article]) -> str:
+def _english_transition_for(index: int) -> str:
+    transitions = [
+        "First",
+        "Next",
+        "In parallel",
+        "Also worth noting",
+        "Another important point",
+        "Elsewhere",
+        "Further in this briefing",
+        "Another item to watch",
+        "One final point",
+        "To close",
+    ]
+    return transitions[min(index, len(transitions)) - 1]
+
+
+def _source_credit(articles: list[Article], language: str = "fr") -> str:
     sources = []
     for article in articles:
         if article.source_name not in sources:
             sources.append(article.source_name)
+    if language == "en":
+        return "Sources used for this edition: " + ", ".join(sources) + "."
     return "Sources utilisées pour cette édition: " + ", ".join(sources) + "."
 
 

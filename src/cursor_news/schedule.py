@@ -63,4 +63,6 @@ def _style_from_mapping(value: dict, default_key: str = "") -> StyleSlot:
         key=str(value.get("key", default_key)),
         label=str(value.get("label", default_key)),
         prompt=str(value.get("prompt", "")),
+        language=str(value.get("language", "fr")),
+        tts_voice=value.get("tts_voice") or None,
     )

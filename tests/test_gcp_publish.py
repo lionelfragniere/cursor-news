@@ -1,4 +1,6 @@
-from cursor_news.gcp_publish import build_manifest, latest_bulletins_by_style
+from datetime import datetime
+
+from cursor_news.gcp_publish import build_manifest, latest_bulletins_by_style, recent_bulletins_by_topic
 
 
 def test_latest_bulletins_by_style_keeps_one_per_tone():
@@ -35,5 +37,31 @@ def test_manifest_includes_current_and_bulletins_by_style():
 
     assert manifest["current"]["audio_url"] == "https://example.test/audio/current/live.mp3"
     assert manifest["current"]["archive_audio_url"] == "https://example.test/audio/bulletins/current.mp3"
+    assert manifest["bulletins_by_topic"][0]["style_key"] == "enfant"
     assert manifest["bulletins_by_style"][0]["style_key"] == "enfant"
     assert manifest["bulletins_by_style"][0]["audio_url"] == "https://example.test/audio/bulletins/child.mp3"
+
+
+def test_recent_bulletins_by_topic_keeps_only_retention_window():
+    history = [
+        {
+            "id": "recent",
+            "slot_start": "2026-05-18T10:00:00+02:00",
+            "style_key": "suisse",
+            "audio_path": "recent.mp3",
+        },
+        {
+            "id": "old",
+            "slot_start": "2026-05-18T07:00:00+02:00",
+            "style_key": "international",
+            "audio_path": "old.mp3",
+        },
+    ]
+
+    selected = recent_bulletins_by_topic(
+        history,
+        retention_hours=2,
+        now=datetime.fromisoformat("2026-05-18T10:30:00+02:00"),
+    )
+
+    assert [item["id"] for item in selected] == ["recent"]

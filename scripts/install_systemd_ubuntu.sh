@@ -33,11 +33,11 @@ EOF
 
 cat > "$SYSTEMD_DIR/cursor-news-tick.timer" <<'EOF'
 [Unit]
-Description=Run Cursor News every ten minutes
+Description=Run Cursor News every hour
 
 [Timer]
 OnBootSec=2min
-OnCalendar=*:0/10
+OnCalendar=*:00:00
 Persistent=true
 RandomizedDelaySec=20
 Unit=cursor-news-tick.service

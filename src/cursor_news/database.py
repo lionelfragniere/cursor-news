@@ -246,16 +246,17 @@ class Database:
             row = con.execute("SELECT id FROM articles WHERE url_hash = ?", (url_hash,)).fetchone()
             return int(row["id"]), True
 
-    def list_candidate_articles(self, limit: int) -> list[Article]:
+    def list_candidate_articles(self, limit: int, include_english: bool = False) -> list[Article]:
+        english_clause = "" if include_english else "AND s.region != 'english'"
         with self.connect() as con:
             rows = con.execute(
-                """
-                SELECT a.id, s.name AS source_name, a.title, a.url, a.published_at, a.summary, a.content, s.priority
+                f"""
+                SELECT a.id, s.name AS source_name, s.region, a.title, a.url, a.published_at, a.summary, a.content, s.priority
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.status = 'new'
                   AND a.is_sports = 0
-                  AND s.region != 'english'
+                  {english_clause}
                 ORDER BY s.priority DESC, COALESCE(a.published_at, a.created_at) DESC
                 LIMIT ?
                 """,
@@ -271,19 +272,21 @@ class Database:
                 summary=row["summary"],
                 content=row["content"],
                 priority=int(row["priority"]),
+                region=str(row["region"] or "general"),
             )
             for row in rows
         ]
 
-    def list_recent_articles(self, limit: int) -> list[Article]:
+    def list_recent_articles(self, limit: int, include_english: bool = False) -> list[Article]:
+        english_clause = "" if include_english else "AND s.region != 'english'"
         with self.connect() as con:
             rows = con.execute(
-                """
-                SELECT a.id, s.name AS source_name, a.title, a.url, a.published_at, a.summary, a.content, s.priority
+                f"""
+                SELECT a.id, s.name AS source_name, s.region, a.title, a.url, a.published_at, a.summary, a.content, s.priority
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
-                  AND s.region != 'english'
+                  {english_clause}
                 ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.used_count ASC
                 LIMIT ?
                 """,
@@ -299,6 +302,7 @@ class Database:
                 summary=row["summary"],
                 content=row["content"],
                 priority=int(row["priority"]),
+                region=str(row["region"] or "general"),
             )
             for row in rows
         ]
