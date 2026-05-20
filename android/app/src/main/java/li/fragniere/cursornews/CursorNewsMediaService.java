@@ -48,6 +48,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private AudioItem currentItem;
+    private int playbackGeneration = 0;
 
     @Override
     public void onCreate() {
@@ -191,16 +192,19 @@ public class CursorNewsMediaService extends MediaBrowserService {
 
     private void playItem(AudioItem item) {
         if (item == null) item = liveItem();
+        stopPlayerOnly();
         if (!requestAudioFocus()) {
+            mediaSession.setActive(false);
             setPlaybackState(PlaybackState.STATE_ERROR);
             return;
         }
-        stopPlayerOnly();
+        int generation = ++playbackGeneration;
         currentItem = item;
         updateMetadata(item);
         setPlaybackState(PlaybackState.STATE_BUFFERING);
         try {
             MediaPlayer nextPlayer = new MediaPlayer();
+            mediaPlayer = nextPlayer;
             nextPlayer.setAudioAttributes(new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -208,26 +212,39 @@ public class CursorNewsMediaService extends MediaBrowserService {
             nextPlayer.setDataSource(this, Uri.parse(item.audioUrl));
             nextPlayer.setLooping(item.loop);
             nextPlayer.setOnPreparedListener(player -> {
-                mediaPlayer = player;
+                if (generation != playbackGeneration || player != mediaPlayer) {
+                    releaseQuietly(player);
+                    return;
+                }
                 mediaSession.setActive(true);
                 player.start();
                 setPlaybackState(PlaybackState.STATE_PLAYING);
             });
-            nextPlayer.setOnCompletionListener(player -> setPlaybackState(PlaybackState.STATE_PAUSED));
+            nextPlayer.setOnCompletionListener(player -> {
+                if (generation == playbackGeneration && player == mediaPlayer) {
+                    stopPlayback();
+                }
+            });
             nextPlayer.setOnErrorListener((player, what, extra) -> {
-                setPlaybackState(PlaybackState.STATE_ERROR);
+                if (generation == playbackGeneration && player == mediaPlayer) {
+                    handlePlaybackError();
+                } else {
+                    releaseQuietly(player);
+                }
                 return true;
             });
             nextPlayer.prepareAsync();
         } catch (Exception error) {
+            stopPlayerOnly();
+            abandonAudioFocus();
             setPlaybackState(PlaybackState.STATE_ERROR);
         }
     }
 
     private void pausePlayback() {
-        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-            mediaPlayer.pause();
-        }
+        stopPlayerOnly();
+        mediaSession.setActive(false);
+        abandonAudioFocus();
         setPlaybackState(PlaybackState.STATE_PAUSED);
     }
 
@@ -239,14 +256,15 @@ public class CursorNewsMediaService extends MediaBrowserService {
     }
 
     private void stopPlayerOnly() {
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-            mediaPlayer = null;
-        }
+        playbackGeneration++;
+        MediaPlayer player = mediaPlayer;
+        mediaPlayer = null;
+        releaseQuietly(player);
     }
 
     private boolean requestAudioFocus() {
         if (audioManager == null) return true;
+        abandonAudioFocus();
         audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -264,6 +282,25 @@ public class CursorNewsMediaService extends MediaBrowserService {
         if (audioManager != null && audioFocusRequest != null) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
             audioFocusRequest = null;
+        }
+    }
+
+    private void handlePlaybackError() {
+        stopPlayerOnly();
+        mediaSession.setActive(false);
+        abandonAudioFocus();
+        setPlaybackState(PlaybackState.STATE_ERROR);
+    }
+
+    private void releaseQuietly(MediaPlayer player) {
+        if (player == null) return;
+        try {
+            player.reset();
+        } catch (Exception ignored) {
+        }
+        try {
+            player.release();
+        } catch (Exception ignored) {
         }
     }
 

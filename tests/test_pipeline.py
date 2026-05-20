@@ -201,6 +201,80 @@ def test_pipeline_non_anxiogene_selection_prefers_calm_articles(tmp_path: Path, 
     ]
 
 
+def test_pipeline_english_bulletin_uses_only_english_articles(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="UN News", url="https://news.un.org/rss", region="english", priority=100))
+    pipeline.db.upsert_source(FeedSource(name="RFI", url="https://rfi.fr/rss", region="international", priority=100))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="UN News",
+            title="UN warns of worsening humanitarian access",
+            url="https://news.un.org/en/story",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="UN agencies call for better access to civilians.",
+            content="",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="RFI",
+            title="L'ONU alerte sur l'accès humanitaire",
+            url="https://rfi.fr/fr/story",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Les agences demandent un meilleur accès aux civils.",
+            content="",
+        )
+    )
+
+    selected = pipeline._select_articles("un_relevant")
+
+    assert selected
+    assert {article.region for article in selected} == {"english"}
+
+
+def test_pipeline_french_bulletin_excludes_english_articles(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="BBC", url="https://bbc.com/rss", region="english", priority=150))
+    pipeline.db.upsert_source(FeedSource(name="RFI", url="https://rfi.fr/rss", region="international", priority=100))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="BBC",
+            title="Major international security update",
+            url="https://bbc.com/story",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="A global security update is published.",
+            content="",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="RFI",
+            title="Situation sécuritaire mondiale: nouveau point",
+            url="https://rfi.fr/fr/story",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Un point francophone sur la situation sécuritaire.",
+            content="",
+        )
+    )
+
+    selected = pipeline._select_articles("security_world")
+
+    assert selected
+    assert all(article.region != "english" for article in selected)
+
+
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"

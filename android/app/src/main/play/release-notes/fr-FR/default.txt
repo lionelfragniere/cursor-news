@@ -1,1 +1,1 @@
-Ajout de l'audio à la carte: les derniers bulletins par sujet sont accessibles depuis l'app et Android Auto.
+Correction Android Auto: pause/stop plus fiable après perte réseau, et bulletins séparés par langue.

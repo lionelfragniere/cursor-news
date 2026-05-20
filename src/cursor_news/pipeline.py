@@ -23,7 +23,7 @@ from .llm import (
     fallback_bulletin,
     repair_bulletin_french_accents,
 )
-from .models import Article, BulletinDraft
+from .models import Article, BulletinDraft, StyleSlot
 from .schedule import ProgramSchedule
 from .settings import Settings
 from .tts import build_tts_client
@@ -71,7 +71,7 @@ class CursorNewsPipeline:
         self.db.init()
         slot_iso = slot_start.isoformat(timespec="seconds")
         style = self.schedule.style_for(slot_start)
-        articles = self._select_articles(style.key)
+        articles = self._select_articles(style)
         draft = self._draft_bulletin(articles, style, slot_start)
         bulletin_id = f"{slot_start.strftime('%Y%m%dT%H%M%S')}-{style.key}-{uuid.uuid4().hex[:8]}"
         self.db.create_bulletin(bulletin_id, slot_iso, style, draft, articles)
@@ -83,12 +83,14 @@ class CursorNewsPipeline:
             raise
         return bulletin_id
 
-    def _select_articles(self, style_key: str | None = None) -> list[Article]:
+    def _select_articles(self, style: StyleSlot | str | None = None) -> list[Article]:
+        style_key, language = self._style_selection_context(style)
         pool_size = max(self.settings.max_articles * 5, 30)
-        include_english = style_key in {"un_relevant", "international_english", "security_world"}
-        if include_english or style_key in {"valais", "suisse_romande", "suisse", "international"}:
+        include_english = language == "en"
+        if include_english or style_key in {"valais", "suisse_romande", "suisse", "international", "security_world"}:
             pool_size = max(self.settings.max_articles * 10, 120)
         selected = filter_sports_articles(self.db.list_candidate_articles(pool_size, include_english=include_english))
+        selected = _filter_articles_by_language(selected, language)
         if style_key == "enfant":
             selected = filter_child_unsuitable_articles(selected)
         ranking_style = "non_anxiogene" if style_key == "enfant" else style_key
@@ -96,6 +98,7 @@ class CursorNewsPipeline:
         if len(selected) < self.settings.max_articles:
             known_ids = {article.id for article in selected}
             recent = filter_sports_articles(self.db.list_recent_articles(pool_size, include_english=include_english))
+            recent = _filter_articles_by_language(recent, language)
             if style_key == "enfant":
                 recent = filter_child_unsuitable_articles(recent)
             recent = filter_articles_for_topic(recent, ranking_style, minimum=max(3, self.settings.max_articles // 3))
@@ -105,6 +108,16 @@ class CursorNewsPipeline:
         selected = unique_articles_by_story(selected)
         selected = unique_articles_by_topic(selected) if style_key == "enfant" else diversify_articles_by_topic(selected)
         return selected[: self.settings.max_articles]
+
+    def _style_selection_context(self, style: StyleSlot | str | None) -> tuple[str | None, str]:
+        if isinstance(style, StyleSlot):
+            return style.key, style.language
+        style_key = style
+        if style_key:
+            for slot in self.schedule.rotation:
+                if slot.key == style_key:
+                    return slot.key, slot.language
+        return style_key, "fr"
 
     def _draft_bulletin(self, articles: list[Article], style, slot_start: datetime) -> BulletinDraft:
         if not articles:
@@ -213,6 +226,12 @@ class CursorNewsPipeline:
 
 def _safe_stem(value: str) -> str:
     return "".join(char if char.isalnum() or char in "-_" else "-" for char in value)
+
+
+def _filter_articles_by_language(articles: list[Article], language: str) -> list[Article]:
+    if language == "en":
+        return [article for article in articles if article.region == "english"]
+    return [article for article in articles if article.region != "english"]
 
 
 def _infomaniak_metadata_text(item: dict, template: str) -> str:
