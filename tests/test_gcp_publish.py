@@ -97,3 +97,14 @@ def test_latest_bulletins_by_topic_keeps_last_unique_even_when_older():
     selected = latest_bulletins_by_topic(history, limit=6)
 
     assert [item["id"] for item in selected] == ["recent", "old"]
+
+
+def test_latest_bulletins_by_topic_can_ignore_removed_schedule_keys():
+    history = [
+        {"id": "old-tone", "style_key": "journaliste", "audio_path": "old-tone.mp3"},
+        {"id": "topic", "style_key": "suisse", "audio_path": "topic.mp3"},
+    ]
+
+    selected = latest_bulletins_by_topic(history, allowed_keys={"suisse", "international"})
+
+    assert [item["id"] for item in selected] == ["topic"]

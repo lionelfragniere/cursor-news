@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .database import Database
+from .schedule import ProgramSchedule
 from .settings import Settings
 from .site_export import export_site_news
 
@@ -28,9 +29,11 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
+    allowed_topic_keys = {style.key for style in ProgramSchedule.load(settings.schedule_path).rotation}
     bulletins_by_topic = latest_bulletins_by_topic(
         db.bulletin_history(limit=240),
         limit=settings.gcp_topic_archive_limit,
+        allowed_keys=allowed_topic_keys,
     )
     manifest = build_manifest(current, public_base_url, bulletins_by_topic)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -139,12 +142,18 @@ def latest_bulletins_by_style(history: list[dict], limit: int = 6) -> list[dict]
     return latest_bulletins_by_topic(history, limit=limit)
 
 
-def latest_bulletins_by_topic(history: list[dict], limit: int = 6) -> list[dict]:
+def latest_bulletins_by_topic(
+    history: list[dict],
+    limit: int = 6,
+    allowed_keys: set[str] | None = None,
+) -> list[dict]:
     selected: list[dict] = []
     seen: set[str] = set()
     for item in history:
         style_key = str(item.get("style_key") or item.get("style_label") or "")
         if not style_key or style_key in seen:
+            continue
+        if allowed_keys is not None and style_key not in allowed_keys:
             continue
         if not item.get("audio_path"):
             continue
