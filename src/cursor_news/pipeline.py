@@ -112,7 +112,11 @@ class CursorNewsPipeline:
         if self.settings.llm_provider == "template":
             client = TemplateLLMClient()
         elif self.settings.llm_provider == "ollama":
-            client = OllamaLLMClient(self.settings.ollama_base_url, self.settings.ollama_model)
+            client = OllamaLLMClient(
+                self.settings.ollama_base_url,
+                self.settings.ollama_model,
+                self.settings.ollama_timeout_seconds,
+            )
         else:
             raise ValueError(f"Unsupported LLM_PROVIDER: {self.settings.llm_provider}")
         try:
