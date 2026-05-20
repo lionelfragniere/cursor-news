@@ -7,6 +7,14 @@ cd "$ROOT_DIR"
 export PATH="$HOME/.local/bin:$PATH"
 export PYTHONUTF8=1
 
+mkdir -p "$ROOT_DIR/data/cache"
+LOCK_PATH="$ROOT_DIR/data/cache/tick.lock"
+exec 9>"$LOCK_PATH"
+if ! flock -n 9; then
+  echo "Another Cursor News tick is already running; skipping this run."
+  exit 0
+fi
+
 auto_git_pull() {
   if [[ "${CURSOR_NEWS_AUTO_GIT_PULL:-1}" != "1" ]]; then
     echo "Auto git pull disabled."
