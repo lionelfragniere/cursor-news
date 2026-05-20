@@ -116,6 +116,7 @@ class CursorNewsPipeline:
                 self.settings.ollama_base_url,
                 self.settings.ollama_model,
                 self.settings.ollama_timeout_seconds,
+                self.settings.ollama_json_format,
             )
         else:
             raise ValueError(f"Unsupported LLM_PROVIDER: {self.settings.llm_provider}")

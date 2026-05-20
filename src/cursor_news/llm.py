@@ -16,10 +16,11 @@ class LLMClient(Protocol):
 
 
 class OllamaLLMClient:
-    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0):
+    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = False):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.json_format = json_format
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
@@ -27,12 +28,13 @@ class OllamaLLMClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
             "options": {
                 "temperature": 0.35,
                 "num_ctx": 8192,
             },
         }
+        if self.json_format:
+            payload["format"] = "json"
         with httpx.Client(timeout=self.timeout_seconds) as client:
             response = client.post(f"{self.base_url}/api/generate", json=payload)
             response.raise_for_status()
