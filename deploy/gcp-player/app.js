@@ -392,7 +392,34 @@ function renderBulletinCard(item) {
   summary.textContent = item.summary || "";
 
   article.append(label, title, meta, audio, summary);
+  const transcript = renderBulletinTranscript(item.transcript || "");
+  if (transcript) article.append(transcript);
   return article;
+}
+
+function renderBulletinTranscript(transcript) {
+  const paragraphs = transcript
+    .split(/\n{2,}|\r?\n/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!paragraphs.length) return null;
+
+  const details = document.createElement("details");
+  details.className = "bulletin-transcript";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "Transcription texte";
+
+  const body = document.createElement("div");
+  body.className = "bulletin-transcript-text";
+  body.replaceChildren(...paragraphs.map((paragraph) => {
+    const p = document.createElement("p");
+    p.textContent = paragraph;
+    return p;
+  }));
+
+  details.append(summary, body);
+  return details;
 }
 
 function pauseOtherAudio(active) {

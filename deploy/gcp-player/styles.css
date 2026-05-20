@@ -37,15 +37,17 @@ body {
 }
 
 .topbar {
+  align-items: flex-start;
   border-bottom: 1px solid var(--line);
   min-height: 74px;
 }
 
 .brand {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   gap: 14px;
   min-width: 0;
+  padding-top: 8px;
 }
 
 .brand img {
@@ -335,6 +337,47 @@ summary:focus-visible {
 .bulletin-card audio {
   margin-top: 0;
   width: 100%;
+}
+
+.bulletin-transcript {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.bulletin-transcript > summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.bulletin-transcript > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bulletin-transcript > summary::after {
+  content: " +";
+}
+
+.bulletin-transcript[open] > summary::after {
+  content: " -";
+}
+
+.bulletin-transcript-text {
+  color: var(--ink);
+  display: grid;
+  font-size: 14px;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 8px;
+}
+
+.bulletin-transcript-text p {
+  margin: 0;
 }
 
 .filters {
