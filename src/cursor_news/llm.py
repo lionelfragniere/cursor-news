@@ -31,6 +31,7 @@ class OllamaLLMClient:
             "options": {
                 "temperature": 0.35,
                 "num_ctx": 8192,
+                "num_predict": 1800,
             },
         }
         if self.json_format:
@@ -197,6 +198,8 @@ Réponds uniquement en JSON valide avec cette forme:
   "transcript": "texte complet à lire à l'antenne",
   "warnings": []
 }}
+
+/no_think
 """.strip()
 
 
