@@ -22,10 +22,19 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     export_dir.mkdir(parents=True, exist_ok=True)
     news_path = export_dir / "news.json"
     web_news_path = export_dir / "news-web.json"
+    web_extended_news_path = export_dir / "news-web-extended.json"
     manifest_path = export_dir / "manifest.json"
 
     news_payload = export_site_news(settings, news_path, limit=news_limit, include_sports=False)
     web_news_payload = export_site_news(settings, web_news_path, limit=news_limit, include_sports=False, include_english=True)
+    web_extended_news_payload = export_site_news(
+        settings,
+        web_extended_news_path,
+        limit=news_limit,
+        include_sports=False,
+        include_english=True,
+        include_german=True,
+    )
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
@@ -53,6 +62,14 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
             gcloud,
             web_news_path,
             f"{bucket.rstrip('/')}/current/news-web.json",
+            project=project,
+            content_type="application/json; charset=utf-8",
+            cache_control="public, max-age=60",
+        ),
+        _gcloud_cp(
+            gcloud,
+            web_extended_news_path,
+            f"{bucket.rstrip('/')}/current/news-web-extended.json",
             project=project,
             content_type="application/json; charset=utf-8",
             cache_control="public, max-age=60",
@@ -108,7 +125,7 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     publish_state["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     _save_publish_state(state_path, publish_state)
     messages.append(
-        f"published {news_payload['count']} android-safe news and {web_news_payload['count']} web news to {public_base_url}"
+        f"published {news_payload['count']} android-safe news, {web_news_payload['count']} english web news and {web_extended_news_payload['count']} extended web news to {public_base_url}"
     )
     return messages
 

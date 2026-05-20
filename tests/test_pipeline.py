@@ -275,6 +275,44 @@ def test_pipeline_french_bulletin_excludes_english_articles(tmp_path: Path, monk
     assert all(article.region != "english" for article in selected)
 
 
+def test_pipeline_french_bulletin_excludes_german_articles(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="Valais", url="https://example.test/rss", region="valais", priority=150))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Der Staatsrat informiert über neue Massnahmen",
+            url="https://example.test/de",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="Die Regierung im Wallis stellt eine neue Regelung für die Gemeinden vor.",
+            content="",
+            language="de",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Le Valais présente une nouvelle mesure",
+            url="https://example.test/fr",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Le canton explique son projet pour les communes.",
+            content="",
+            language="fr",
+        )
+    )
+
+    selected = pipeline._select_articles("valais")
+
+    assert selected
+    assert [article.language for article in selected] == ["fr"]
+
+
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"

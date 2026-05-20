@@ -612,6 +612,8 @@ public class MainActivity extends Activity {
             article.title = item.optString("title");
             article.source = item.optString("source_name");
             article.region = item.optString("region");
+            article.language = item.optString("language", "unknown");
+            if (article.isGerman()) continue;
             article.url = item.optString("url");
             article.summary = item.optString("summary");
             article.searchTerms = item.optString("search_terms");
@@ -652,7 +654,8 @@ public class MainActivity extends Activity {
         long now = System.currentTimeMillis();
         List<NewsArticle> filtered = new ArrayList<>();
         for (NewsArticle article : articles) {
-            if ("english".equals(article.region) && !includeEnglishFilter) continue;
+            if (article.isGerman()) continue;
+            if (article.isEnglish() && !includeEnglishFilter) continue;
             if (hideReadFilter && readIds.contains(article.id)) continue;
             if (hideSportsFilter && article.isSports) continue;
             if (childOnlyFilter && !article.childFriendly) continue;
@@ -695,7 +698,7 @@ public class MainActivity extends Activity {
 
     private boolean matchesQuery(NewsArticle article, String rawQuery) {
         if (rawQuery == null || rawQuery.trim().isEmpty()) return true;
-        String haystack = normalize(article.title + " " + article.summary + " " + article.source + " " + article.region + " " + article.searchTerms);
+        String haystack = normalize(article.title + " " + article.summary + " " + article.source + " " + article.region + " " + article.language + " " + article.searchTerms);
         List<String> quoted = new ArrayList<>();
         Matcher matcher = Pattern.compile("\"([^\"]+)\"").matcher(rawQuery);
         while (matcher.find()) {
@@ -1129,6 +1132,7 @@ public class MainActivity extends Activity {
         String url = "";
         String summary = "";
         String searchTerms = "";
+        String language = "unknown";
         String publishedAt = "";
         long timestamp = 0;
         int tension = 0;
@@ -1136,6 +1140,14 @@ public class MainActivity extends Activity {
         int priority = 0;
         boolean childFriendly = false;
         boolean isSports = false;
+
+        boolean isEnglish() {
+            return "english".equals(region) || "en".equals(language);
+        }
+
+        boolean isGerman() {
+            return "de".equals(language);
+        }
     }
 
     private static class BulletinAudio {

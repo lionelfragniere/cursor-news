@@ -16,6 +16,7 @@ const state = {
     priority: 0,
     childOnly: false,
     includeEnglish: false,
+    includeGerman: false,
     hideSports: true,
     hideRead: true,
   },
@@ -38,6 +39,7 @@ const els = {
   priorityValue: document.querySelector("#priority-value"),
   child: document.querySelector("#child-filter"),
   english: document.querySelector("#english-filter"),
+  german: document.querySelector("#german-filter"),
   sports: document.querySelector("#sports-filter"),
   read: document.querySelector("#read-filter"),
   reset: document.querySelector("#reset-filters"),
@@ -67,7 +69,7 @@ function containsTargetedTerm(haystack, term) {
 function matchesQuery(article, rawQuery) {
   const query = rawQuery.trim();
   if (!query) return true;
-  const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region} ${article.search_terms || ""}`);
+  const haystack = normalize(`${article.title} ${article.summary} ${article.source_name} ${article.region} ${article.language || ""} ${article.search_terms || ""}`);
   const quotedTerms = [...query.matchAll(/"([^"]+)"/g)]
     .map((match) => normalize(match[1]).trim())
     .filter(Boolean);
@@ -122,6 +124,12 @@ function displayFilterValue(value) {
   return value;
 }
 
+function articleLanguage(article) {
+  if (article.language) return article.language;
+  if (article.region === "english") return "en";
+  return "unknown";
+}
+
 function setupFilters(payload) {
   fillSelect(els.region, payload.regions || [], "Toutes les régions");
   fillSelect(els.source, payload.sources || [], "Toutes les sources");
@@ -136,6 +144,7 @@ function setupFilters(payload) {
     [els.priority, "input"],
     [els.child, "change"],
     [els.english, "change"],
+    [els.german, "change"],
     [els.sports, "change"],
     [els.read, "change"],
   ];
@@ -148,6 +157,9 @@ function applyUrlFilterPreset() {
   if (params.get("english") === "1" || params.get("english") === "true") {
     els.english.checked = true;
     if (params.get("region") === "english") els.region.value = "english";
+  }
+  if (params.get("german") === "1" || params.get("german") === "true" || params.get("de") === "1") {
+    els.german.checked = true;
   }
 }
 
@@ -162,6 +174,7 @@ function updateFromControls() {
     priority: Number(els.priority.value),
     childOnly: els.child.checked,
     includeEnglish: els.english.checked,
+    includeGerman: els.german.checked,
     hideSports: els.sports.checked,
     hideRead: els.read.checked,
   };
@@ -180,6 +193,7 @@ function resetFilters() {
   els.priority.value = "0";
   els.child.checked = false;
   els.english.checked = false;
+  els.german.checked = false;
   els.sports.checked = true;
   els.read.checked = true;
   updateFromControls();
@@ -187,7 +201,9 @@ function resetFilters() {
 
 function filteredArticles() {
   const filtered = state.articles.filter((article) => {
-    if (article.region === "english" && !state.filters.includeEnglish) return false;
+    const language = articleLanguage(article);
+    if ((article.region === "english" || language === "en") && !state.filters.includeEnglish) return false;
+    if (language === "de" && !state.filters.includeGerman) return false;
     if (state.filters.region !== "all" && article.region !== state.filters.region) return false;
     if (!matchesDateRange(article)) return false;
     if (state.filters.source !== "all" && article.source_name !== state.filters.source) return false;
@@ -298,6 +314,8 @@ function renderArticle(article) {
     tag(`tension ${article.tension}/10`, article.tension >= 4 ? "alert" : ""),
     tag(`focus ${article.priority}`),
   );
+  const language = articleLanguage(article);
+  if (language === "en" || language === "de") tags.append(tag(language.toUpperCase()));
   if (article.child_friendly) tags.append(tag("enfants"));
   if (article.is_sports) tags.append(tag("sport", "alert"));
   if (article.status === "used") tags.append(tag("bulletin"));
@@ -457,6 +475,8 @@ async function init() {
 
 async function fetchNewsPayload() {
   const cacheBust = Date.now();
+  const extendedWebResponse = await fetch(`${GCP_DATA_BASE_URL}/news-web-extended.json?v=${cacheBust}`, { cache: "no-store" });
+  if (extendedWebResponse.ok) return extendedWebResponse;
   const webResponse = await fetch(`${GCP_DATA_BASE_URL}/news-web.json?v=${cacheBust}`, { cache: "no-store" });
   if (webResponse.ok) return webResponse;
   return fetch(`${GCP_DATA_BASE_URL}/news.json?v=${cacheBust}`, { cache: "no-store" });

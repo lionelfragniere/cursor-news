@@ -100,3 +100,41 @@ def test_export_site_news_keeps_english_web_only(tmp_path: Path, monkeypatch):
     assert "english" in web_payload["regions"]
     assert [item["source_name"] for item in android_payload["articles"]] == ["RTN"]
     assert {item["source_name"] for item in web_payload["articles"]} == {"RTN", "UN News"}
+
+
+def test_export_site_news_keeps_german_web_only(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    settings = load_settings()
+    db = Database(settings.database_path)
+    db.init()
+    db.upsert_source(FeedSource(name="Valais", url="https://example.test/rss", region="valais", priority=140))
+    db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Der Staatsrat informiert über neue Massnahmen",
+            url="https://example.test/de",
+            published_at="2026-05-19T08:00:00+00:00",
+            summary="Die Regierung im Wallis stellt eine neue Regelung für die Gemeinden vor.",
+            content="",
+            language="de",
+        )
+    )
+    db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Une actualité valaisanne",
+            url="https://example.test/fr",
+            published_at="2026-05-19T09:00:00+00:00",
+            summary="Une information locale.",
+            content="",
+            language="fr",
+        )
+    )
+
+    android_payload = export_site_news(settings, tmp_path / "android.json", limit=20)
+    web_payload = export_site_news(settings, tmp_path / "web.json", limit=20, include_german=True)
+
+    assert [item["language"] for item in android_payload["articles"]] == ["fr"]
+    assert {item["language"] for item in web_payload["articles"]} == {"fr", "de"}

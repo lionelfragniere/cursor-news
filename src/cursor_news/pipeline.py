@@ -230,8 +230,12 @@ def _safe_stem(value: str) -> str:
 
 def _filter_articles_by_language(articles: list[Article], language: str) -> list[Article]:
     if language == "en":
-        return [article for article in articles if article.region == "english"]
-    return [article for article in articles if article.region != "english"]
+        return [article for article in articles if article.region == "english" and article.language == "en"]
+    return [
+        article
+        for article in articles
+        if article.region != "english" and article.language in {"fr", "unknown"}
+    ]
 
 
 def _infomaniak_metadata_text(item: dict, template: str) -> str:

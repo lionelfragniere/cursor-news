@@ -113,3 +113,25 @@ def test_english_articles_are_excluded_from_bulletin_candidates(tmp_path: Path):
 
     assert [item.id for item in db.list_candidate_articles(10)] == [local_id]
     assert [item.id for item in db.list_recent_articles(10)] == [local_id]
+
+
+def test_article_language_is_stored_per_article(tmp_path: Path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource(name="Valais", url="https://example.test/rss", region="valais"))
+    article_id, _ = db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Der Staatsrat informiert über neue Massnahmen",
+            url="https://example.test/de",
+            published_at=None,
+            summary="Die Regierung im Wallis stellt eine neue Regelung für die Gemeinden vor.",
+            content="",
+            language="de",
+        )
+    )
+
+    archive = db.article_archive(limit=10)
+
+    assert article_id is not None
+    assert archive[0]["language"] == "de"

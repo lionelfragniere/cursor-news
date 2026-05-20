@@ -16,6 +16,7 @@ def export_site_news(
     limit: int = 400,
     include_sports: bool = False,
     include_english: bool = False,
+    include_german: bool = False,
 ) -> dict:
     db = Database(settings.database_path)
     db.init()
@@ -25,11 +26,13 @@ def export_site_news(
         limit=max(1, limit),
         include_sports=include_sports,
         include_english=include_english,
+        include_german=include_german,
     )
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "count": len(articles),
         "regions": sorted({item["region"] for item in articles if item["region"]}),
+        "languages": sorted({item["language"] for item in articles if item["language"]}),
         "sources": sorted({item["source_name"] for item in articles if item["source_name"]}),
         "articles": articles,
     }
@@ -37,12 +40,21 @@ def export_site_news(
     return payload
 
 
-def _export_articles(db: Database, limit: int, include_sports: bool, include_english: bool) -> list[dict]:
+def _export_articles(
+    db: Database,
+    limit: int,
+    include_sports: bool,
+    include_english: bool,
+    include_german: bool,
+) -> list[dict]:
     filters: list[str] = []
     if not include_sports:
         filters.append("a.is_sports = 0")
     if not include_english:
         filters.append("s.region != 'english'")
+        filters.append("a.language != 'en'")
+    if not include_german:
+        filters.append("a.language != 'de'")
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
     with db.connect() as con:
         rows = con.execute(
@@ -51,6 +63,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool, include_eng
                    s.name AS source_name,
                    s.region,
                    s.priority,
+                   a.language,
                    a.title,
                    a.url,
                    a.published_at,
@@ -82,6 +95,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool, include_eng
             content=str(row["content"] or ""),
             priority=int(row["priority"]),
             region=str(row["region"] or "general"),
+            language=str(row["language"] or "unknown"),
         )
         key = story_key(article)
         if key in seen_stories:
@@ -96,6 +110,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool, include_eng
                 "id": article.id,
                 "source_name": article.source_name,
                 "region": str(row["region"] or "general"),
+                "language": article.language,
                 "priority": article.priority,
                 "title": article.title,
                 "url": article.url,
@@ -108,7 +123,7 @@ def _export_articles(db: Database, limit: int, include_sports: bool, include_eng
                 "tension": tension,
                 "calm": calm,
                 "child_friendly": not child_unsuitable and not bool(row["is_sports"]),
-                "search_terms": _search_terms(article, str(row["region"] or "general")),
+                "search_terms": _search_terms(article, str(row["region"] or "general"), article.language),
             }
         )
         if len(items) >= limit:
@@ -123,7 +138,9 @@ def _excerpt(text: str, max_length: int = 320) -> str:
     return clean[:max_length].rsplit(" ", 1)[0] + "..."
 
 
-def _search_terms(article: Article, region: str) -> str:
+def _search_terms(article: Article, region: str, language: str) -> str:
+    if language == "de":
+        return "de deutsch allemand valais oberwallis haut-valais"
     if region != "english":
         return ""
     terms = ["english"]

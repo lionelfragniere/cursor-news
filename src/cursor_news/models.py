@@ -25,6 +25,7 @@ class ArticleInput:
     published_at: str | None
     summary: str
     content: str
+    language: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class Article:
     content: str
     priority: int = 50
     region: str = "general"
+    language: str = "unknown"
 
     def prompt_text(self) -> str:
         body = self.content or self.summary
@@ -46,7 +48,8 @@ class Article:
             body = body[:800].rsplit(" ", 1)[0] + "..."
         return (
             f"- Source: {self.source_name}\n"
-            f"  Région/langue: {self.region}\n"
+            f"  Région: {self.region}\n"
+            f"  Langue détectée: {self.language}\n"
             f"  Titre: {self.title}\n"
             f"  URL: {self.url}\n"
             f"  Date: {self.published_at or 'inconnue'}\n"

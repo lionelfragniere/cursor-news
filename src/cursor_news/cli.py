@@ -55,6 +55,7 @@ def main(argv: list[str] | None = None) -> None:
     site.add_argument("--limit", type=int, default=400)
     site.add_argument("--include-sports", action="store_true")
     site.add_argument("--include-english", action="store_true")
+    site.add_argument("--include-german", action="store_true")
 
     publish_gcp = sub.add_parser("publish-gcp")
     publish_gcp.add_argument("--news-limit", type=int, default=500)
@@ -147,6 +148,7 @@ def main(argv: list[str] | None = None) -> None:
             limit=args.limit,
             include_sports=args.include_sports,
             include_english=args.include_english,
+            include_german=args.include_german,
         )
         print(f"Export site: {output_path}")
         print(f"Articles: {payload['count']}")

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterator
 
 from .article_filter import is_sports_text
+from .language import detect_article_language, normalize_article_language
 from .models import Article, ArticleInput, AudioResult, BulletinDraft, FeedSource, StyleSlot
 
 
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS articles (
     scraped_at TEXT NOT NULL,
     summary TEXT NOT NULL DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'unknown',
     status TEXT NOT NULL DEFAULT 'new',
     is_sports INTEGER NOT NULL DEFAULT 0,
     used_count INTEGER NOT NULL DEFAULT 0,
@@ -194,14 +196,15 @@ class Database:
         url_hash = canonical_hash(article.url)
         is_sports = 1 if is_sports_text(article.title, article.summary, article.content) else 0
         with self.connect() as con:
-            source = con.execute("SELECT id FROM sources WHERE name = ?", (article.source_name,)).fetchone()
+            source = con.execute("SELECT id, region FROM sources WHERE name = ?", (article.source_name,)).fetchone()
             if not source:
                 raise ValueError(f"Unknown source: {article.source_name}")
+            language = _article_language(article, str(source["region"] or ""))
             cur = con.execute(
                 """
                 INSERT OR IGNORE INTO articles
-                    (source_id, title, url, url_hash, published_at, scraped_at, summary, content, is_sports, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (source_id, title, url, url_hash, published_at, scraped_at, summary, content, language, is_sports, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     int(source["id"]),
@@ -212,6 +215,7 @@ class Database:
                     now,
                     article.summary,
                     article.content,
+                    language,
                     is_sports,
                     now,
                     now,
@@ -225,6 +229,7 @@ class Database:
                         published_at = COALESCE(?, published_at),
                         summary = ?,
                         content = ?,
+                        language = ?,
                         is_sports = ?,
                         scraped_at = ?,
                         updated_at = ?
@@ -235,6 +240,7 @@ class Database:
                         article.published_at,
                         article.summary,
                         article.content,
+                        language,
                         is_sports,
                         now,
                         now,
@@ -251,7 +257,7 @@ class Database:
         with self.connect() as con:
             rows = con.execute(
                 f"""
-                SELECT a.id, s.name AS source_name, s.region, a.title, a.url, a.published_at, a.summary, a.content, s.priority
+                SELECT a.id, s.name AS source_name, s.region, a.language, a.title, a.url, a.published_at, a.summary, a.content, s.priority
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.status = 'new'
@@ -273,6 +279,7 @@ class Database:
                 content=row["content"],
                 priority=int(row["priority"]),
                 region=str(row["region"] or "general"),
+                language=str(row["language"] or "unknown"),
             )
             for row in rows
         ]
@@ -282,7 +289,7 @@ class Database:
         with self.connect() as con:
             rows = con.execute(
                 f"""
-                SELECT a.id, s.name AS source_name, s.region, a.title, a.url, a.published_at, a.summary, a.content, s.priority
+                SELECT a.id, s.name AS source_name, s.region, a.language, a.title, a.url, a.published_at, a.summary, a.content, s.priority
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
@@ -303,6 +310,7 @@ class Database:
                 content=row["content"],
                 priority=int(row["priority"]),
                 region=str(row["region"] or "general"),
+                language=str(row["language"] or "unknown"),
             )
             for row in rows
         ]
@@ -445,6 +453,7 @@ class Database:
                        a.url,
                        a.published_at,
                        a.scraped_at,
+                       a.language,
                        a.status,
                        a.is_sports,
                        a.used_count
@@ -530,12 +539,41 @@ def _migrate(con: sqlite3.Connection) -> None:
     article_columns = {row["name"] for row in con.execute("PRAGMA table_info(articles)").fetchall()}
     if "is_sports" not in article_columns:
         con.execute("ALTER TABLE articles ADD COLUMN is_sports INTEGER NOT NULL DEFAULT 0")
-    rows = con.execute("SELECT id, title, summary, content FROM articles").fetchall()
+    if "language" not in article_columns:
+        con.execute("ALTER TABLE articles ADD COLUMN language TEXT NOT NULL DEFAULT 'unknown'")
+    rows = con.execute(
+        """
+        SELECT a.id, a.title, a.summary, a.content, a.language, s.region
+        FROM articles a
+        JOIN sources s ON s.id = a.source_id
+        """
+    ).fetchall()
     for row in rows:
+        language = str(row["language"] or "unknown")
+        if language == "unknown" or str(row["region"] or "") == "english":
+            language = detect_article_language(
+                row["title"],
+                row["summary"],
+                row["content"],
+                source_region=str(row["region"] or ""),
+            )
         con.execute(
-            "UPDATE articles SET is_sports = ? WHERE id = ?",
+            "UPDATE articles SET is_sports = ?, language = ? WHERE id = ?",
             (
                 1 if is_sports_text(row["title"], row["summary"], row["content"]) else 0,
+                language,
                 row["id"],
             ),
         )
+
+
+def _article_language(article: ArticleInput, source_region: str) -> str:
+    language = normalize_article_language(article.language)
+    if language != "unknown":
+        return language
+    return detect_article_language(
+        article.title,
+        article.summary,
+        article.content,
+        source_region=source_region,
+    )

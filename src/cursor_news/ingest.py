@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -11,6 +12,7 @@ import feedparser
 import httpx
 
 from .database import Database
+from .language import detect_article_language
 from .models import ArticleInput, FeedSource
 from .sources import load_sources
 from .text import canonicalize_url, extract_main_text, normalize_text, strip_html
@@ -61,6 +63,7 @@ class FeedIngestor:
                 continue
             if source.region != "english" and len(article.content) < 260 and article.url:
                 article = self._enrich_article(client, article)
+            article = self._with_detected_language(source, article)
             _article_id, created = self.db.upsert_article(article)
             if created:
                 new_articles += 1
@@ -118,6 +121,7 @@ class FeedIngestor:
             published_at=_entry_date(entry),
             summary=summary,
             content=normalize_text(content),
+            language=detect_article_language(title, summary, content, source_region=source.region),
         )
 
     def _enrich_article(self, client: httpx.Client, article: ArticleInput) -> ArticleInput:
@@ -136,10 +140,20 @@ class FeedIngestor:
                     published_at=article.published_at,
                     summary=article.summary,
                     content=text[:4000],
+                    language=article.language,
                 )
         except Exception:
             return article
         return article
+
+    def _with_detected_language(self, source: FeedSource, article: ArticleInput) -> ArticleInput:
+        language = detect_article_language(
+            article.title,
+            article.summary,
+            article.content,
+            source_region=source.region,
+        )
+        return replace(article, language=language)
 
 
 def _entry_date(entry: Any) -> str | None:

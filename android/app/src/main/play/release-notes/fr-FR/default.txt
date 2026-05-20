@@ -1,1 +1,1 @@
-Correction Android Auto: pause/stop plus fiable après perte réseau, et bulletins séparés par langue.
+Les articles allemands sont exclus de l'application et des bulletins parlés. Ils peuvent rester disponibles côté web avec un filtre dédié.
