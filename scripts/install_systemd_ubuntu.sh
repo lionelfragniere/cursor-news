@@ -51,7 +51,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now cursor-news-tick.timer
 
 if command -v loginctl >/dev/null 2>&1; then
-  sudo loginctl enable-linger "$USER"
+  sudo -n loginctl enable-linger "$USER" >/dev/null 2>&1 || true
 fi
 
 cat <<'MSG'
