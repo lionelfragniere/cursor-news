@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<NewsArticle> articles = new ArrayList<>();
+    private final List<BulletinAudio> bulletins = new ArrayList<>();
     private final Set<String> readIds = new HashSet<>();
     private final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.FRANCE)
         .withZone(ZoneId.of("Europe/Zurich"));
@@ -101,8 +102,10 @@ public class MainActivity extends Activity {
     private TextView tensionValue;
     private TextView priorityValue;
     private LinearLayout advancedFilters;
+    private LinearLayout bulletinList;
     private Button playButton;
     private Button advancedButton;
+    private Button bulletinsButton;
     private Button markAllReadButton;
     private EditText search;
     private Spinner period;
@@ -128,6 +131,7 @@ public class MainActivity extends Activity {
     private boolean childOnlyFilter = false;
     private boolean includeEnglishFilter = false;
     private boolean advancedOpen = false;
+    private boolean bulletinsOpen = false;
     private boolean restoringFilters = false;
     private String audioUrl = DATA_BASE + "/live.mp3";
     private MediaPlayer mediaPlayer;
@@ -281,6 +285,23 @@ public class MainActivity extends Activity {
         player.addView(playButton);
 
         header.addView(player, new LinearLayout.LayoutParams(match(), wrap()));
+
+        LinearLayout audioChoice = roundedPanel(panelColor, lineColor);
+        audioChoice.setOrientation(LinearLayout.VERTICAL);
+        audioChoice.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams audioChoiceParams = new LinearLayout.LayoutParams(match(), wrap());
+        audioChoiceParams.setMargins(0, dp(8), 0, 0);
+
+        bulletinsButton = actionButton("Audio à la carte", false);
+        bulletinsButton.setOnClickListener(v -> toggleBulletins());
+        audioChoice.addView(bulletinsButton, new LinearLayout.LayoutParams(match(), wrap()));
+
+        bulletinList = new LinearLayout(this);
+        bulletinList.setOrientation(LinearLayout.VERTICAL);
+        bulletinList.setVisibility(View.GONE);
+        audioChoice.addView(bulletinList);
+
+        header.addView(audioChoice, audioChoiceParams);
         return header;
     }
 
@@ -464,6 +485,9 @@ public class MainActivity extends Activity {
     }
 
     private void applyManifest(JSONObject manifest) {
+        parseBulletins(manifest);
+        renderBulletins();
+
         JSONObject current = manifest.optJSONObject("current");
         if (current == null) {
             currentFlash.setText("Aucun flash audio");
@@ -480,6 +504,101 @@ public class MainActivity extends Activity {
         String title = current.optString("title", "Cursor News");
         String cleanTitle = title.replace("Cursor News - ", "").trim();
         currentFlash.setText(cleanTitle.equalsIgnoreCase(style) ? "Flash en cours - " + style : style + " - " + cleanTitle);
+    }
+
+    private void parseBulletins(JSONObject manifest) {
+        bulletins.clear();
+        if (manifest == null) return;
+        JSONArray array = manifest.optJSONArray("bulletins_by_topic");
+        if (array == null) array = manifest.optJSONArray("bulletins_by_style");
+        if (array == null) return;
+        for (int index = 0; index < array.length(); index++) {
+            JSONObject item = array.optJSONObject(index);
+            if (item == null) continue;
+            String archiveUrl = item.optString("archive_audio_url", item.optString("audio_url", ""));
+            if (archiveUrl.isEmpty()) continue;
+            BulletinAudio audio = new BulletinAudio();
+            audio.id = item.optString("id");
+            audio.label = item.optString("style", item.optString("style_key", "Bulletin"));
+            audio.title = item.optString("title", audio.label).replace("Cursor News - ", "").trim();
+            audio.audioUrl = archiveUrl;
+            audio.slotStart = item.optString("slot_start");
+            audio.durationSeconds = item.optInt("duration_seconds", 0);
+            bulletins.add(audio);
+        }
+    }
+
+    private void renderBulletins() {
+        if (bulletinsButton == null || bulletinList == null) return;
+        bulletinList.removeAllViews();
+        if (bulletins.isEmpty()) {
+            bulletinsButton.setText("Aucun autre bulletin");
+            bulletinsButton.setEnabled(false);
+            bulletinList.setVisibility(View.GONE);
+            return;
+        }
+        bulletinsButton.setEnabled(true);
+        bulletinsButton.setText((bulletinsOpen ? "Masquer les bulletins" : "Audio à la carte") + " (" + bulletins.size() + ")");
+        bulletinList.setVisibility(bulletinsOpen ? View.VISIBLE : View.GONE);
+        for (BulletinAudio bulletin : bulletins) {
+            bulletinList.addView(bulletinView(bulletin));
+        }
+    }
+
+    private View bulletinView(BulletinAudio bulletin) {
+        LinearLayout row = roundedPanel(softColor, lineColor);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(10), dp(8), dp(8), dp(8));
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(match(), wrap());
+        rowParams.setMargins(0, dp(8), 0, 0);
+        row.setLayoutParams(rowParams);
+
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        text.addView(label(bulletin.label, 14, Typeface.BOLD, inkColor));
+        String meta = bulletinMeta(bulletin);
+        if (!meta.isEmpty()) text.addView(label(meta, 12, Typeface.BOLD, mutedColor));
+        row.addView(text, new LinearLayout.LayoutParams(0, wrap(), 1));
+
+        Button listen = actionButton("Lire", true);
+        listen.setOnClickListener(v -> playBulletin(bulletin));
+        row.setOnClickListener(v -> playBulletin(bulletin));
+        row.addView(listen);
+        return row;
+    }
+
+    private String bulletinMeta(BulletinAudio bulletin) {
+        List<String> parts = new ArrayList<>();
+        long timestamp = parseDate(bulletin.slotStart);
+        if (timestamp > 0) parts.add(dateFormat.format(Instant.ofEpochMilli(timestamp)));
+        if (bulletin.durationSeconds > 0) parts.add(formatDuration(bulletin.durationSeconds));
+        return String.join(" · ", parts);
+    }
+
+    private String formatDuration(int seconds) {
+        int safe = Math.max(0, seconds);
+        return (safe / 60) + ":" + String.format(Locale.FRANCE, "%02d", safe % 60);
+    }
+
+    private void toggleBulletins() {
+        bulletinsOpen = !bulletinsOpen;
+        renderBulletins();
+    }
+
+    private void playBulletin(BulletinAudio bulletin) {
+        if (bulletin == null || bulletin.audioUrl.isEmpty()) return;
+        if (!bulletin.audioUrl.equals(audioUrl)) {
+            if (mediaPlayer != null) {
+                mediaPlayer.release();
+                mediaPlayer = null;
+            }
+            audioPreparing = false;
+            playButton.setText("Lire");
+        }
+        audioUrl = bulletin.audioUrl;
+        currentFlash.setText("Flash à la carte - " + bulletin.label);
+        toggleAudio();
     }
 
     private List<NewsArticle> parseArticles(JSONArray array) {
@@ -1017,5 +1136,14 @@ public class MainActivity extends Activity {
         int priority = 0;
         boolean childFriendly = false;
         boolean isSports = false;
+    }
+
+    private static class BulletinAudio {
+        String id = "";
+        String label = "";
+        String title = "";
+        String audioUrl = "";
+        String slotStart = "";
+        int durationSeconds = 0;
     }
 }

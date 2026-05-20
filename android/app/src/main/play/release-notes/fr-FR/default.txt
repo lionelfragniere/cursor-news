@@ -1,1 +1,1 @@
-Ajout du bouton Tout lu avec confirmation, pour marquer en une fois les actualités affichées comme lues.
+Ajout de l'audio à la carte: les derniers bulletins par sujet sont accessibles depuis l'app et Android Auto.

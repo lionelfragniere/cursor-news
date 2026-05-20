@@ -258,12 +258,6 @@ def _template_opener(style: StyleSlot) -> str:
             return "Bonjour, vous écoutez Cursor News. Ce point suit les nouvelles importantes pour les Nations Unies, l'humanitaire, les droits humains, la paix et la sécurité."
         case "security_world":
             return "Bonjour, vous écoutez Cursor News. Voici le point sur la situation sécuritaire mondiale, avec prudence, contexte et faits vérifiés."
-        case key if key in {"suisse_romande", "valais", "suisse", "international", "un_relevant", "security_world"}:
-            return (
-                f"{transition}, {title}. "
-                f"{_sentence(excerpt)} "
-                "Ce qu'il faut retenir maintenant, c'est le lien entre les faits confirmés, les décisions attendues et les conséquences concrètes pour les prochains jours."
-            )
         case "pote":
             return "Salut, c'est Cursor News. On prend quelques minutes pour faire le tour des infos qui comptent, sans jargon et sans tourner autour du pot."
         case "non_anxiogene":
@@ -281,11 +275,12 @@ def _template_opener(style: StyleSlot) -> str:
 def _template_segment(style: StyleSlot, index: int, title: str, source: str, text: str) -> str:
     excerpt = _word_limit(_clean_article_text(text, source), 115)
     transition = _transition_for(index)
+    context = _template_context_sentence(style, index)
+    context_suffix = f" {context}" if context else ""
     if style.language == "en":
         return (
             f"{_english_transition_for(index)}, {title}. "
-            f"{_sentence(excerpt)} "
-            "For listeners following global affairs, the point to watch is how governments, international organizations and local communities respond over the next few hours."
+            f"{_sentence(excerpt)}{context_suffix}"
         )
     match style.key:
         case "pote":
@@ -314,8 +309,44 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
         case _:
             return (
                 f"{transition}, {title}. "
-                f"{_sentence(excerpt)}"
+                f"{_sentence(excerpt)}{context_suffix}"
             )
+
+
+def _template_context_sentence(style: StyleSlot, index: int) -> str:
+    if style.language == "en":
+        options = [
+            "The next signal to watch is how institutions respond, and whether the situation widens beyond the first announcements.",
+            "The broader question is whether this becomes a short news cycle or a decision point for diplomacy, aid, or security policy.",
+            "For listeners following international affairs, the useful marker is what changes on the ground, not only what leaders say.",
+        ]
+    elif style.key == "un_relevant":
+        options = [
+            "Ce dossier comptera surtout par ses effets sur l'aide humanitaire, les droits humains ou la diplomatie multilatérale.",
+            "La suite dépendra des décisions prises par les autorités concernées, les agences internationales et les partenaires sur le terrain.",
+            "Pour les organisations internationales, l'élément à suivre sera la capacité de coordination et de protection des personnes touchées.",
+        ]
+    elif style.key == "security_world":
+        options = [
+            "Le point à suivre est l'évolution du risque réel, loin des déclarations les plus bruyantes.",
+            "Dans les prochaines heures, les confirmations indépendantes seront plus importantes que les premières réactions politiques.",
+            "Ce dossier demande de surveiller les faits établis, les déplacements de population et les décisions de sécurité concrètes.",
+        ]
+    elif style.key == "valais":
+        options = [
+            "Pour le Valais, l'intérêt se joue dans les conséquences concrètes pour les communes, les habitants ou les acteurs économiques.",
+            "La suite dira si le sujet reste local ou s'il prend une portée plus large dans le canton.",
+            "On suivra les réponses des autorités et les effets pratiques pour les personnes directement concernées.",
+        ]
+    elif style.key in {"suisse_romande", "suisse", "international"}:
+        options = [
+            "La suite se jouera dans les décisions attendues et dans leurs effets concrets pour le public.",
+            "Le repère utile sera de distinguer les faits confirmés des réactions qui peuvent encore évoluer.",
+            "Cursor News suivra surtout ce que cette information change dans les prochaines heures.",
+        ]
+    else:
+        return ""
+    return options[(index - 1) % len(options)]
 
 
 def _template_closer(style: StyleSlot) -> str:

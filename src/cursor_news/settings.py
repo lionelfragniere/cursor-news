@@ -74,6 +74,7 @@ class Settings:
     gcloud_path: str
     gcp_public_base_url: str | None
     gcp_bulletin_retention_hours: int
+    gcp_topic_archive_limit: int
 
     @property
     def sources_path(self) -> Path:
@@ -168,6 +169,7 @@ def load_settings() -> Settings:
         gcloud_path=os.getenv("GCLOUD_PATH", "gcloud"),
         gcp_public_base_url=os.getenv("GCP_PUBLIC_BASE_URL") or None,
         gcp_bulletin_retention_hours=max(1, int(os.getenv("GCP_BULLETIN_RETENTION_HOURS", "2"))),
+        gcp_topic_archive_limit=max(1, int(os.getenv("GCP_TOPIC_ARCHIVE_LIMIT", "12"))),
     )
 
     settings.ensure_dirs()

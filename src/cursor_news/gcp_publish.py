@@ -28,9 +28,9 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
-    bulletins_by_topic = recent_bulletins_by_topic(
-        db.bulletin_history(limit=120),
-        retention_hours=settings.gcp_bulletin_retention_hours,
+    bulletins_by_topic = latest_bulletins_by_topic(
+        db.bulletin_history(limit=240),
+        limit=settings.gcp_topic_archive_limit,
     )
     manifest = build_manifest(current, public_base_url, bulletins_by_topic)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

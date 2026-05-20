@@ -1,6 +1,11 @@
 from datetime import datetime
 
-from cursor_news.gcp_publish import build_manifest, latest_bulletins_by_style, recent_bulletins_by_topic
+from cursor_news.gcp_publish import (
+    build_manifest,
+    latest_bulletins_by_style,
+    latest_bulletins_by_topic,
+    recent_bulletins_by_topic,
+)
 
 
 def test_latest_bulletins_by_style_keeps_one_per_tone():
@@ -65,3 +70,30 @@ def test_recent_bulletins_by_topic_keeps_only_retention_window():
     )
 
     assert [item["id"] for item in selected] == ["recent"]
+
+
+def test_latest_bulletins_by_topic_keeps_last_unique_even_when_older():
+    history = [
+        {
+            "id": "recent",
+            "slot_start": "2026-05-18T10:00:00+02:00",
+            "style_key": "suisse",
+            "audio_path": "recent.mp3",
+        },
+        {
+            "id": "old",
+            "slot_start": "2026-05-18T07:00:00+02:00",
+            "style_key": "international",
+            "audio_path": "old.mp3",
+        },
+        {
+            "id": "older-suisse",
+            "slot_start": "2026-05-18T06:00:00+02:00",
+            "style_key": "suisse",
+            "audio_path": "older-suisse.mp3",
+        },
+    ]
+
+    selected = latest_bulletins_by_topic(history, limit=6)
+
+    assert [item["id"] for item in selected] == ["recent", "old"]
