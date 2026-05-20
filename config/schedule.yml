@@ -26,9 +26,10 @@ rotation:
     prompt: "Bulletin international en français: sélectionne les grands faits mondiaux vraiment utiles à comprendre depuis la Suisse romande. Donne du contexte sans noyer l'auditeur dans les détails."
 
   - key: un_relevant
-    label: ONU / Nations Unies
-    language: fr
-    prompt: "Bulletin utile pour une personne intéressée par l'ONU: relie les informations aux Nations Unies, à l'aide humanitaire, aux droits humains, à la santé mondiale, aux réfugiés, au climat, à la paix, à la sécurité et à la diplomatie multilatérale."
+    label: UN / ONU
+    language: en
+    tts_voice: en-US-JennyNeural
+    prompt: "English-language United Nations briefing: focus on UN agencies, humanitarian aid, human rights, global health, refugees, climate, peace and security, and multilateral diplomacy. Explain why each item matters for people following the UN system. Keep it clear, spoken, factual and non-sensational."
 
   - key: international_english
     label: International English

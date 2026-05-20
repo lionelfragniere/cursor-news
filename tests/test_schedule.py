@@ -26,3 +26,10 @@ def test_schedule_uses_hourly_topic_rotation():
         "international_english",
         "security_world",
     ]
+
+
+def test_un_briefing_is_in_english():
+    schedule = ProgramSchedule.load(Path("config/schedule.yml"))
+    un_slot = next(style for style in schedule.rotation if style.key == "un_relevant")
+    assert un_slot.language == "en"
+    assert un_slot.tts_voice == "en-US-JennyNeural"

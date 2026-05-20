@@ -244,6 +244,8 @@ def fallback_bulletin(style: StyleSlot) -> BulletinDraft:
 
 def _template_opener(style: StyleSlot) -> str:
     if style.language == "en":
+        if style.key == "un_relevant":
+            return "You are listening to Cursor News. Here is the United Nations briefing, with the facts, the humanitarian context, and what to watch next."
         return "You are listening to Cursor News. Here is the international briefing in English, with the facts, the context, and what to watch next."
     match style.key:
         case "suisse_romande":
@@ -315,11 +317,18 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
 
 def _template_context_sentence(style: StyleSlot, index: int) -> str:
     if style.language == "en":
-        options = [
-            "The next signal to watch is how institutions respond, and whether the situation widens beyond the first announcements.",
-            "The broader question is whether this becomes a short news cycle or a decision point for diplomacy, aid, or security policy.",
-            "For listeners following international affairs, the useful marker is what changes on the ground, not only what leaders say.",
-        ]
+        if style.key == "un_relevant":
+            options = [
+                "For the UN system, the key question is how this affects protection, access, funding, or diplomatic coordination.",
+                "The next signal to watch is whether agencies, member states, and local partners can turn statements into practical action.",
+                "For listeners following multilateral affairs, the useful marker is what changes for civilians and field operations.",
+            ]
+        else:
+            options = [
+                "The next signal to watch is how institutions respond, and whether the situation widens beyond the first announcements.",
+                "The broader question is whether this becomes a short news cycle or a decision point for diplomacy, aid, or security policy.",
+                "For listeners following international affairs, the useful marker is what changes on the ground, not only what leaders say.",
+            ]
     elif style.key == "un_relevant":
         options = [
             "Ce dossier comptera surtout par ses effets sur l'aide humanitaire, les droits humains ou la diplomatie multilatérale.",
