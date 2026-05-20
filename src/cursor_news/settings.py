@@ -120,7 +120,7 @@ def load_settings() -> Settings:
         timezone=os.getenv("CURSOR_NEWS_TIMEZONE", "Europe/Zurich"),
         host=os.getenv("CURSOR_NEWS_HOST", "0.0.0.0"),
         port=int(os.getenv("CURSOR_NEWS_PORT", "8000")),
-        buffer_slots=max(1, int(os.getenv("CURSOR_NEWS_BUFFER_SLOTS", "2"))),
+        buffer_slots=max(1, int(os.getenv("CURSOR_NEWS_BUFFER_SLOTS", "3"))),
         generate_max_per_tick=max(1, int(os.getenv("CURSOR_NEWS_GENERATE_MAX_PER_TICK", "2"))),
         max_articles=max(1, int(os.getenv("CURSOR_NEWS_MAX_ARTICLES", "12"))),
         ingest_interval_minutes=max(1, int(os.getenv("CURSOR_NEWS_INGEST_INTERVAL_MINUTES", "5"))),
