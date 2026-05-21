@@ -1,1 +1,1 @@
-Les articles allemands sont exclus de l'application et des bulletins parlés. Ils peuvent rester disponibles côté web avec un filtre dédié.
+Android Auto affiche les derniers flashs par sujet et reprend le flash au dernier point d'écoute après pause, stop ou coupure réseau.

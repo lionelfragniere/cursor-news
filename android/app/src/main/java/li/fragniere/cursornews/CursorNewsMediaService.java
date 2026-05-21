@@ -1,5 +1,6 @@
 package li.fragniere.cursornews;
 
+import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
@@ -13,6 +14,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.service.media.MediaBrowserService;
 
 import org.json.JSONArray;
@@ -36,12 +38,32 @@ public class CursorNewsMediaService extends MediaBrowserService {
     private static final String LIVE_AUDIO_URL = DATA_BASE + "/live.mp3";
     private static final String PREFS = "cursor-news";
     private static final String PREF_INCLUDE_ENGLISH = "filter-include-english";
+    private static final String PREF_LAST_MEDIA_ID = "audio-last-media-id";
+    private static final String PREF_LAST_TITLE = "audio-last-title";
+    private static final String PREF_LAST_SUBTITLE = "audio-last-subtitle";
+    private static final String PREF_LAST_URL = "audio-last-url";
+    private static final String PREF_LAST_LOOP = "audio-last-loop";
+    private static final String PREF_LAST_POSITION_MS = "audio-last-position-ms";
+    private static final String PREF_LAST_DURATION_MS = "audio-last-duration-ms";
     private static final String ROOT_ID = "cursor-news-root";
+    private static final String LATEST_ID = "cursor-news-latest";
+    private static final String RESUME_ID = "cursor-news-resume";
     private static final String LIVE_ID = "cursor-news-live";
+    private static final long RESUME_REWIND_MS = 3000L;
+    private static final long PROGRESS_SAVE_INTERVAL_MS = 5000L;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, AudioItem> catalog = new LinkedHashMap<>();
+    private final Runnable progressSaver = new Runnable() {
+        @Override
+        public void run() {
+            savePlaybackProgress();
+            if (mediaPlayer != null) {
+                main.postDelayed(this, PROGRESS_SAVE_INTERVAL_MS);
+            }
+        }
+    };
 
     private MediaSession mediaSession;
     private MediaPlayer mediaPlayer;
@@ -59,15 +81,24 @@ public class CursorNewsMediaService extends MediaBrowserService {
         mediaSession.setCallback(new MediaSession.Callback() {
             @Override
             public void onPlay() {
-                playItem(currentItem != null ? currentItem : liveItem());
+                AudioItem item = currentItem != null ? currentItem : savedItem();
+                playItem(item != null ? item : liveItem());
             }
 
             @Override
             public void onPlayFromMediaId(String mediaId, Bundle extras) {
                 executor.execute(() -> {
                     refreshCatalog();
-                    AudioItem item = catalog.get(mediaId);
-                    main.post(() -> playItem(item != null ? item : liveItem()));
+                    AudioItem item = RESUME_ID.equals(mediaId) ? savedItem() : null;
+                    synchronized (catalog) {
+                        if (item == null) item = catalog.get(mediaId);
+                    }
+                    if (item == null) {
+                        AudioItem saved = savedItem();
+                        if (saved != null && saved.id.equals(mediaId)) item = saved;
+                    }
+                    AudioItem selected = item != null && !item.browsable ? item : liveItem();
+                    main.post(() -> playItem(selected));
                 });
             }
 
@@ -89,10 +120,17 @@ public class CursorNewsMediaService extends MediaBrowserService {
             public void onStop() {
                 stopPlayback();
             }
+
+            @Override
+            public void onSeekTo(long pos) {
+                seekTo(pos);
+            }
         });
         setSessionToken(mediaSession.getSessionToken());
         catalog.put(LIVE_ID, liveItem());
-        setPlaybackState(PlaybackState.STATE_NONE);
+        currentItem = savedItem();
+        if (currentItem != null) updateMetadata(currentItem);
+        setPlaybackState(currentItem != null ? PlaybackState.STATE_PAUSED : PlaybackState.STATE_NONE);
     }
 
     @Override
@@ -104,10 +142,23 @@ public class CursorNewsMediaService extends MediaBrowserService {
     public void onLoadChildren(String parentId, Result<List<MediaBrowser.MediaItem>> result) {
         result.detach();
         executor.execute(() -> {
-            List<AudioItem> items = ROOT_ID.equals(parentId) ? refreshCatalog() : new ArrayList<>();
+            List<AudioItem> refreshed = refreshCatalog();
             List<MediaBrowser.MediaItem> mediaItems = new ArrayList<>();
-            for (AudioItem item : items) {
-                mediaItems.add(toMediaItem(item));
+            if (ROOT_ID.equals(parentId)) {
+                AudioItem resume = resumeItem();
+                if (resume != null) mediaItems.add(toMediaItem(resume));
+                AudioItem live;
+                synchronized (catalog) {
+                    live = catalog.get(LIVE_ID);
+                }
+                mediaItems.add(toMediaItem(live != null ? live : liveItem()));
+                mediaItems.add(toMediaItem(folderItem()));
+            } else if (LATEST_ID.equals(parentId)) {
+                for (AudioItem item : refreshed) {
+                    if (!item.browsable && !LIVE_ID.equals(item.id)) {
+                        mediaItems.add(toMediaItem(item));
+                    }
+                }
             }
             main.post(() -> result.sendResult(mediaItems));
         });
@@ -115,6 +166,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
 
     @Override
     public void onDestroy() {
+        savePlaybackProgress();
         stopPlayback();
         executor.shutdownNow();
         mediaSession.release();
@@ -136,7 +188,8 @@ public class CursorNewsMediaService extends MediaBrowserService {
                     "Flash en cours - " + style,
                     mediaSubtitle(cleanTitle(title)),
                     absoluteAudioUrl(current.optString("audio_url", LIVE_AUDIO_URL)),
-                    true
+                    true,
+                    false
                 ));
             }
             JSONArray bulletins = manifest.optJSONArray("bulletins_by_topic");
@@ -144,15 +197,25 @@ public class CursorNewsMediaService extends MediaBrowserService {
                 bulletins = manifest.optJSONArray("bulletins_by_style");
             }
             if (bulletins != null) {
+                boolean includeEnglish = includeEnglishEnabled();
                 for (int index = 0; index < bulletins.length(); index++) {
                     JSONObject item = bulletins.optJSONObject(index);
                     if (item == null) continue;
+                    String styleKey = item.optString("style_key", "");
+                    if (!includeEnglish && isEnglishBulletin(styleKey)) continue;
                     String id = item.optString("id", "bulletin-" + index);
                     String style = item.optString("style", "Bulletin");
                     String title = cleanTitle(item.optString("title", "Cursor News"));
                     String audio = item.optString("archive_audio_url", item.optString("audio_url", ""));
                     if (audio.isEmpty()) continue;
-                    next.put("bulletin:" + id, new AudioItem("bulletin:" + id, style, title, absoluteAudioUrl(audio), false));
+                    next.put("bulletin:" + id, new AudioItem(
+                        "bulletin:" + id,
+                        style,
+                        title,
+                        absoluteAudioUrl(audio),
+                        false,
+                        false
+                    ));
                 }
             }
         } catch (Exception ignored) {
@@ -168,7 +231,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
         HttpURLConnection connection = (HttpURLConnection) new URL(url + "?v=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(12000);
-        connection.setRequestProperty("User-Agent", "CursorNewsAndroidAuto/0.5");
+        connection.setRequestProperty("User-Agent", "CursorNewsAndroidAuto/0.9");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
             StringBuilder builder = new StringBuilder();
             String line;
@@ -180,27 +243,30 @@ public class CursorNewsMediaService extends MediaBrowserService {
     }
 
     private MediaBrowser.MediaItem toMediaItem(AudioItem item) {
-        MediaDescription description = new MediaDescription.Builder()
+        MediaDescription.Builder builder = new MediaDescription.Builder()
             .setMediaId(item.id)
             .setTitle(item.title)
             .setSubtitle(item.subtitle)
-            .setMediaUri(Uri.parse(item.audioUrl))
-            .setIconUri(Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.ic_launcher))
-            .build();
-        return new MediaBrowser.MediaItem(description, MediaBrowser.MediaItem.FLAG_PLAYABLE);
+            .setIconUri(Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.ic_launcher));
+        if (!item.audioUrl.isEmpty()) builder.setMediaUri(Uri.parse(item.audioUrl));
+        int flags = item.browsable ? MediaBrowser.MediaItem.FLAG_BROWSABLE : MediaBrowser.MediaItem.FLAG_PLAYABLE;
+        return new MediaBrowser.MediaItem(builder.build(), flags);
     }
 
     private void playItem(AudioItem item) {
         if (item == null) item = liveItem();
-        stopPlayerOnly();
+        if (item.browsable) return;
+        final AudioItem playbackItem = item;
+        stopPlayerOnly(true);
         if (!requestAudioFocus()) {
             mediaSession.setActive(false);
             setPlaybackState(PlaybackState.STATE_ERROR);
             return;
         }
         int generation = ++playbackGeneration;
-        currentItem = item;
-        updateMetadata(item);
+        currentItem = playbackItem;
+        long resumePositionMs = resumePositionFor(playbackItem);
+        updateMetadata(playbackItem);
         setPlaybackState(PlaybackState.STATE_BUFFERING);
         try {
             MediaPlayer nextPlayer = new MediaPlayer();
@@ -209,20 +275,24 @@ public class CursorNewsMediaService extends MediaBrowserService {
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build());
-            nextPlayer.setDataSource(this, Uri.parse(item.audioUrl));
-            nextPlayer.setLooping(item.loop);
+            nextPlayer.setDataSource(this, Uri.parse(playbackItem.audioUrl));
+            nextPlayer.setLooping(playbackItem.loop);
             nextPlayer.setOnPreparedListener(player -> {
                 if (generation != playbackGeneration || player != mediaPlayer) {
                     releaseQuietly(player);
                     return;
                 }
                 mediaSession.setActive(true);
+                seekPreparedPlayer(player, resumePositionMs);
+                updateMetadata(playbackItem);
                 player.start();
+                savePlaybackProgress();
+                startProgressUpdates();
                 setPlaybackState(PlaybackState.STATE_PLAYING);
             });
             nextPlayer.setOnCompletionListener(player -> {
                 if (generation == playbackGeneration && player == mediaPlayer) {
-                    stopPlayback();
+                    completePlayback();
                 }
             });
             nextPlayer.setOnErrorListener((player, what, extra) -> {
@@ -235,27 +305,39 @@ public class CursorNewsMediaService extends MediaBrowserService {
             });
             nextPlayer.prepareAsync();
         } catch (Exception error) {
-            stopPlayerOnly();
+            stopPlayerOnly(false);
             abandonAudioFocus();
             setPlaybackState(PlaybackState.STATE_ERROR);
         }
     }
 
     private void pausePlayback() {
-        stopPlayerOnly();
+        savePlaybackProgress();
+        stopPlayerOnly(false);
         mediaSession.setActive(false);
         abandonAudioFocus();
         setPlaybackState(PlaybackState.STATE_PAUSED);
     }
 
     private void stopPlayback() {
-        stopPlayerOnly();
+        savePlaybackProgress();
+        stopPlayerOnly(false);
         mediaSession.setActive(false);
         abandonAudioFocus();
         setPlaybackState(PlaybackState.STATE_STOPPED);
     }
 
-    private void stopPlayerOnly() {
+    private void completePlayback() {
+        clearResumePositionForCurrent();
+        stopPlayerOnly(false);
+        mediaSession.setActive(false);
+        abandonAudioFocus();
+        setPlaybackState(PlaybackState.STATE_STOPPED);
+    }
+
+    private void stopPlayerOnly(boolean saveProgress) {
+        if (saveProgress) savePlaybackProgress();
+        stopProgressUpdates();
         playbackGeneration++;
         MediaPlayer player = mediaPlayer;
         mediaPlayer = null;
@@ -286,7 +368,8 @@ public class CursorNewsMediaService extends MediaBrowserService {
     }
 
     private void handlePlaybackError() {
-        stopPlayerOnly();
+        savePlaybackProgress();
+        stopPlayerOnly(false);
         mediaSession.setActive(false);
         abandonAudioFocus();
         setPlaybackState(PlaybackState.STATE_ERROR);
@@ -309,6 +392,7 @@ public class CursorNewsMediaService extends MediaBrowserService {
             .putString(MediaMetadata.METADATA_KEY_TITLE, item.title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, "Cursor News")
             .putString(MediaMetadata.METADATA_KEY_ALBUM, item.subtitle)
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, savedDurationMs())
             .build());
     }
 
@@ -317,24 +401,165 @@ public class CursorNewsMediaService extends MediaBrowserService {
             | PlaybackState.ACTION_PLAY_FROM_MEDIA_ID
             | PlaybackState.ACTION_PLAY_FROM_SEARCH
             | PlaybackState.ACTION_PAUSE
+            | PlaybackState.ACTION_SEEK_TO
             | PlaybackState.ACTION_STOP;
         mediaSession.setPlaybackState(new PlaybackState.Builder()
             .setActions(actions)
-            .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, state == PlaybackState.STATE_PLAYING ? 1f : 0f)
+            .setState(state, playbackPositionMs(), state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime())
             .build());
+    }
+
+    private void seekTo(long positionMs) {
+        if (mediaPlayer == null) {
+            savePosition(positionMs, savedDurationMs());
+            setPlaybackState(PlaybackState.STATE_PAUSED);
+            return;
+        }
+        try {
+            mediaPlayer.seekTo((int) Math.max(0L, positionMs));
+            savePlaybackProgress();
+            setPlaybackState(mediaPlayer.isPlaying() ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void seekPreparedPlayer(MediaPlayer player, long positionMs) {
+        if (positionMs <= 0) return;
+        try {
+            int duration = player.getDuration();
+            int target = (int) Math.max(0L, positionMs);
+            if (duration > 0) target = Math.min(target, Math.max(0, duration - 1000));
+            player.seekTo(target);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void savePlaybackProgress() {
+        if (currentItem == null) return;
+        long position = playbackPositionMs();
+        long duration = savedDurationMs();
+        if (mediaPlayer != null) {
+            try {
+                duration = Math.max(0, mediaPlayer.getDuration());
+            } catch (Exception ignored) {
+            }
+        }
+        savePosition(position, duration);
+    }
+
+    private void savePosition(long positionMs, long durationMs) {
+        if (currentItem == null) return;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString(PREF_LAST_MEDIA_ID, currentItem.id)
+            .putString(PREF_LAST_TITLE, currentItem.title)
+            .putString(PREF_LAST_SUBTITLE, currentItem.subtitle)
+            .putString(PREF_LAST_URL, currentItem.audioUrl)
+            .putBoolean(PREF_LAST_LOOP, currentItem.loop)
+            .putLong(PREF_LAST_POSITION_MS, Math.max(0L, positionMs))
+            .putLong(PREF_LAST_DURATION_MS, Math.max(0L, durationMs))
+            .apply();
+    }
+
+    private void clearResumePositionForCurrent() {
+        if (currentItem == null) return;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString(PREF_LAST_MEDIA_ID, currentItem.id)
+            .putString(PREF_LAST_TITLE, currentItem.title)
+            .putString(PREF_LAST_SUBTITLE, currentItem.subtitle)
+            .putString(PREF_LAST_URL, currentItem.audioUrl)
+            .putBoolean(PREF_LAST_LOOP, currentItem.loop)
+            .putLong(PREF_LAST_POSITION_MS, 0L)
+            .putLong(PREF_LAST_DURATION_MS, savedDurationMs())
+            .apply();
+    }
+
+    private long playbackPositionMs() {
+        if (mediaPlayer != null) {
+            try {
+                return Math.max(0, mediaPlayer.getCurrentPosition());
+            } catch (Exception ignored) {
+            }
+        }
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getLong(PREF_LAST_POSITION_MS, 0L);
+    }
+
+    private long savedDurationMs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getLong(PREF_LAST_DURATION_MS, 0L);
+    }
+
+    private long resumePositionFor(AudioItem item) {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String savedId = prefs.getString(PREF_LAST_MEDIA_ID, "");
+        String savedUrl = prefs.getString(PREF_LAST_URL, "");
+        String savedTitle = prefs.getString(PREF_LAST_TITLE, "");
+        long savedPosition = prefs.getLong(PREF_LAST_POSITION_MS, 0L);
+        long savedDuration = prefs.getLong(PREF_LAST_DURATION_MS, 0L);
+        if (!item.id.equals(savedId) || !item.audioUrl.equals(savedUrl)) return 0L;
+        if (LIVE_ID.equals(item.id) && !item.title.equals(savedTitle)) return 0L;
+        if (savedDuration > 0L && savedPosition > savedDuration - 8000L) return 0L;
+        return Math.max(0L, savedPosition - RESUME_REWIND_MS);
+    }
+
+    private AudioItem savedItem() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String id = prefs.getString(PREF_LAST_MEDIA_ID, "");
+        String url = prefs.getString(PREF_LAST_URL, "");
+        if (id.isEmpty() || url.isEmpty()) return null;
+        return new AudioItem(
+            id,
+            prefs.getString(PREF_LAST_TITLE, "Cursor News"),
+            prefs.getString(PREF_LAST_SUBTITLE, "Dernier flash"),
+            url,
+            prefs.getBoolean(PREF_LAST_LOOP, false),
+            false
+        );
+    }
+
+    private AudioItem resumeItem() {
+        AudioItem saved = savedItem();
+        long position = playbackPositionMs();
+        if (saved == null || position < 5000L) return null;
+        return new AudioItem(
+            RESUME_ID,
+            "Reprendre - " + saved.title,
+            saved.subtitle + " - " + formatTime(position),
+            saved.audioUrl,
+            saved.loop,
+            false
+        );
+    }
+
+    private void startProgressUpdates() {
+        stopProgressUpdates();
+        main.postDelayed(progressSaver, PROGRESS_SAVE_INTERVAL_MS);
+    }
+
+    private void stopProgressUpdates() {
+        main.removeCallbacks(progressSaver);
     }
 
     private AudioItem firstMatch(List<AudioItem> items, String query) {
         String normalized = normalize(query);
-        if (normalized.isEmpty()) return items.isEmpty() ? liveItem() : items.get(0);
+        if (normalized.isEmpty()) return items.isEmpty() ? liveItem() : firstPlayable(items);
         for (AudioItem item : items) {
-            if (normalize(item.title + " " + item.subtitle).contains(normalized)) return item;
+            if (!item.browsable && normalize(item.title + " " + item.subtitle).contains(normalized)) return item;
         }
-        return items.isEmpty() ? liveItem() : items.get(0);
+        return items.isEmpty() ? liveItem() : firstPlayable(items);
+    }
+
+    private AudioItem firstPlayable(List<AudioItem> items) {
+        for (AudioItem item : items) {
+            if (!item.browsable) return item;
+        }
+        return liveItem();
     }
 
     private AudioItem liveItem() {
-        return new AudioItem(LIVE_ID, "Flash en cours", mediaSubtitle("Cursor News"), LIVE_AUDIO_URL, true);
+        return new AudioItem(LIVE_ID, "Flash en cours", mediaSubtitle("Cursor News"), LIVE_AUDIO_URL, true, false);
+    }
+
+    private AudioItem folderItem() {
+        return new AudioItem(LATEST_ID, "Derniers flashs", "Choisir un sujet", "", false, true);
     }
 
     private String absoluteAudioUrl(String url) {
@@ -343,18 +568,31 @@ public class CursorNewsMediaService extends MediaBrowserService {
         return DATA_BASE + "/" + url.replaceFirst("^/+", "");
     }
 
+    private boolean includeEnglishEnabled() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_INCLUDE_ENGLISH, false);
+    }
+
+    private boolean isEnglishBulletin(String styleKey) {
+        return "international_english".equals(styleKey) || "un_relevant".equals(styleKey);
+    }
+
     private String cleanTitle(String title) {
         String clean = title == null ? "" : title.replace("Cursor News - ", "").trim();
         return clean.isEmpty() ? "Cursor News" : clean;
     }
 
     private String mediaSubtitle(String value) {
-        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_INCLUDE_ENGLISH, false)) return value;
+        if (!includeEnglishEnabled()) return value;
         return value + " - English / UN actif";
     }
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private String formatTime(long milliseconds) {
+        long seconds = Math.max(0L, milliseconds / 1000L);
+        return String.format(Locale.FRANCE, "%d:%02d", seconds / 60L, seconds % 60L);
     }
 
     private static final class AudioItem {
@@ -363,13 +601,15 @@ public class CursorNewsMediaService extends MediaBrowserService {
         final String subtitle;
         final String audioUrl;
         final boolean loop;
+        final boolean browsable;
 
-        AudioItem(String id, String title, String subtitle, String audioUrl, boolean loop) {
+        AudioItem(String id, String title, String subtitle, String audioUrl, boolean loop, boolean browsable) {
             this.id = id;
             this.title = title;
             this.subtitle = subtitle;
             this.audioUrl = audioUrl;
             this.loop = loop;
+            this.browsable = browsable;
         }
     }
 }
