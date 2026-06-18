@@ -20,13 +20,16 @@ from .llm import (
     OllamaLLMClient,
     TemplateLLMClient,
     enforce_source_credit_at_end,
-    fallback_bulletin,
     repair_bulletin_french_accents,
 )
 from .models import Article, BulletinDraft, StyleSlot
 from .schedule import ProgramSchedule
 from .settings import Settings
 from .tts import build_tts_client
+
+
+class DraftRejectedError(RuntimeError):
+    """Raised when a text draft is not good enough to turn into audio."""
 
 
 class CursorNewsPipeline:
@@ -58,7 +61,10 @@ class CursorNewsPipeline:
                 slot_iso = slot_start.isoformat(timespec="seconds")
                 if self.db.bulletin_exists(slot_iso):
                     continue
-                bulletin_id = self.generate_slot(slot_start)
+                try:
+                    bulletin_id = self.generate_slot(slot_start)
+                except DraftRejectedError:
+                    continue
                 if not bulletin_id:
                     continue
                 generated.append(bulletin_id)
@@ -87,6 +93,21 @@ class CursorNewsPipeline:
             self.db.mark_bulletin_error(bulletin_id, str(exc))
             raise
         return bulletin_id
+
+    def draft_slot_text(self, style_key: str, slot_start: datetime | None = None) -> tuple[StyleSlot, list[Article], BulletinDraft]:
+        self.db.init()
+        style = self._style_by_key(style_key)
+        slot_start = slot_start or self.schedule.floor_slot()
+        articles = self._select_articles(style)
+        if not articles:
+            raise DraftRejectedError(f"No usable articles for {style.label}")
+        return style, articles, self._draft_bulletin(articles, style, slot_start)
+
+    def _style_by_key(self, style_key: str) -> StyleSlot:
+        for style in self.schedule.rotation:
+            if style.key == style_key:
+                return style
+        raise ValueError(f"Unknown style key: {style_key}")
 
     def _select_articles(self, style: StyleSlot | str | None = None) -> list[Article]:
         style_key, language = self._style_selection_context(style)
@@ -127,9 +148,10 @@ class CursorNewsPipeline:
 
     def _draft_bulletin(self, articles: list[Article], style, slot_start: datetime) -> BulletinDraft:
         if not articles:
-            return fallback_bulletin(style)
+            raise DraftRejectedError(f"No usable articles for {style.label}")
         if self.settings.llm_provider == "template":
             client = TemplateLLMClient()
+            draft = client.generate_bulletin(articles, style, slot_start)
         elif self.settings.llm_provider == "ollama":
             client = OllamaLLMClient(
                 self.settings.ollama_base_url,
@@ -137,8 +159,12 @@ class CursorNewsPipeline:
                 self.settings.ollama_timeout_seconds,
                 self.settings.ollama_json_format,
             )
+            draft = self._generate_validated_llm_draft(client, articles, style, slot_start)
         else:
             raise ValueError(f"Unsupported LLM_PROVIDER: {self.settings.llm_provider}")
+        if getattr(style, "language", "fr") == "fr":
+            draft = repair_bulletin_french_accents(draft)
+        return enforce_source_credit_at_end(draft, articles, language=getattr(style, "language", "fr"))
         try:
             draft = client.generate_bulletin(articles, style, slot_start)
             if not draft.transcript.strip():
@@ -161,6 +187,30 @@ class CursorNewsPipeline:
         if getattr(style, "language", "fr") == "fr":
             draft = repair_bulletin_french_accents(draft)
         return enforce_source_credit_at_end(draft, articles, language=getattr(style, "language", "fr"))
+
+    def _generate_validated_llm_draft(
+        self,
+        client: OllamaLLMClient,
+        articles: list[Article],
+        style: StyleSlot,
+        slot_start: datetime,
+    ) -> BulletinDraft:
+        draft: BulletinDraft | None = None
+        issue = ""
+        for _attempt in range(3):
+            try:
+                if draft is None:
+                    draft = client.generate_bulletin(articles, style, slot_start)
+                else:
+                    draft = client.revise_bulletin(draft, articles, style, slot_start, issue)
+            except Exception as exc:
+                raise DraftRejectedError(f"LLM draft failed for {style.label}: {exc}") from exc
+
+            draft = _normalize_draft_for_quality(draft, articles, style)
+            issue = _draft_quality_issue(draft)
+            if not issue:
+                return draft
+        raise DraftRejectedError(f"LLM draft rejected for {style.label}: {issue}")
 
     def _render_audio(self, bulletin_id: str, draft: BulletinDraft, style):
         stem = _safe_stem(bulletin_id)
@@ -261,6 +311,13 @@ def _infomaniak_metadata_text(item: dict, template: str) -> str:
         return f"{values['artist']} - {values['title']}"
 
 
+def _normalize_draft_for_quality(draft: BulletinDraft, articles: list[Article], style: StyleSlot) -> BulletinDraft:
+    language = getattr(style, "language", "fr")
+    if language == "fr":
+        draft = repair_bulletin_french_accents(draft)
+    return enforce_source_credit_at_end(draft, articles, language=language)
+
+
 def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     word_count = len(draft.transcript.split())
     warning_text = " ".join(draft.warnings).lower()
@@ -283,11 +340,15 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     )
     if "trop court" in warning_text or "too short" in warning_text:
         return "LLM self-reported a short transcript"
-    if word_count < 260:
-        return f"LLM returned a short transcript ({word_count} words)"
+    if transcript.count("sources utilisées pour cette édition") > 1:
+        return "LLM returned duplicate source credits"
+    if transcript.count("sources used for this edition") > 1:
+        return "LLM returned duplicate source credits"
     for phrase in generic_child_phrases:
         if phrase in transcript:
             return f"LLM returned generic radio filler: {phrase}"
+    if word_count < 600:
+        return f"LLM returned a short transcript ({word_count} words)"
     repeated = _repeated_paragraph_opening(draft.transcript)
     if repeated:
         return f"LLM returned repetitive paragraph openings: {repeated}"

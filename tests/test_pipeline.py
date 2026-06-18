@@ -516,8 +516,8 @@ def test_draft_quality_issue_rejects_short_llm_output():
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
 
 
-def test_draft_quality_accepts_compact_valid_llm_output():
-    draft = BulletinDraft(title="Compact", summary="", transcript=" ".join(["mot"] * 300))
+def test_draft_quality_accepts_radio_length_valid_llm_output():
+    draft = BulletinDraft(title="Format radio", summary="", transcript=" ".join(["mot"] * 650))
     assert _draft_quality_issue(draft) is None
 
 

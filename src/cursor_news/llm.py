@@ -24,7 +24,7 @@ class OllamaLLMClient:
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
-        return self._generate_json(prompt, temperature=0.2, num_predict=2300)
+        return self._generate_json(prompt, temperature=0.2, num_predict=3600)
 
     def revise_bulletin(
         self,
@@ -35,7 +35,7 @@ class OllamaLLMClient:
         issue: str,
     ) -> BulletinDraft:
         prompt = build_revision_prompt(draft, articles, style, slot_start, issue)
-        revised = self._generate_json(prompt, temperature=0.18, num_predict=2300)
+        revised = self._generate_json(prompt, temperature=0.18, num_predict=3600)
         return BulletinDraft(
             title=revised.title,
             summary=revised.summary,
@@ -199,7 +199,7 @@ Rewrite the bulletin from scratch as a fluent public-service radio script in Eng
 Mandatory constraints:
 - Keep only facts supported by the source pack.
 - Keep the same topic: {style.label}.
-- Write 650 to 900 words, with 5 to 7 developed items.
+- Write 900 to 1200 words, with 5 to 7 developed items.
 - The script will be read aloud by text-to-speech: use clear punctuation, natural rhythm, and no bullet points.
 - Do not read RSS headlines as section titles. Turn them into spoken leads.
 - Do not mention media names inside the body. Put source credits only in the final sentence.
@@ -233,7 +233,7 @@ Réécris entièrement le bulletin en français naturel, comme un vrai script ra
 Contraintes obligatoires:
 - Garde uniquement les faits présents dans le paquet de sources.
 - Garde le même sujet: {style.label}.
-- Écris 650 à 900 mots, avec 5 à 7 sujets développés.
+- Écris 900 à 1200 mots, avec 5 à 7 sujets développés.
 - Le texte sera lu à voix haute par une synthèse vocale: ponctuation claire, rythme naturel, phrases pas trop longues.
 - Ne lis pas les titres RSS comme des intertitres. Transforme-les en lancements parlés.
 - Ne cite aucun média dans le corps du bulletin. Les sources vont seulement dans la toute dernière phrase.
@@ -274,7 +274,7 @@ Consigne éditoriale: {style.prompt}
 Angle spécifique: {guidance}
 
 Mission:
-- Produire un bulletin d'environ 5 à 7 minutes, entre 650 et 900 mots.
+- Produire un bulletin d'environ 7 à 8 minutes, entre 900 et 1200 mots.
 - Choisir 5 à 7 sujets maximum dans le paquet de sources. Ignore les articles faibles, doublons ou hors sujet.
 - Ouvrir par une accroche sobre qui donne l'angle du bulletin, pas par une formule générique.
 - Pour chaque sujet: lancer l'information, expliquer seulement le contexte présent dans les sources, puis dire ce qui est confirmé, prévu ou incertain.
@@ -323,7 +323,7 @@ Editorial brief: {style.prompt}
 Specific angle: {guidance}
 
 Mission:
-- Produce a five- to seven-minute briefing, between 650 and 900 words.
+- Produce a seven- to eight-minute briefing, between 900 and 1200 words.
 - Select 5 to 7 items from the source pack. Ignore weak, duplicate, or off-topic items.
 - Open with a focused radio lead, not a generic greeting.
 - For each item: state the news, give only the useful context present in the sources, then say what remains confirmed, planned or uncertain.

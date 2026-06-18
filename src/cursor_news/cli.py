@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime
+from pathlib import Path
 
 import uvicorn
 
@@ -27,6 +28,10 @@ def main(argv: list[str] | None = None) -> None:
 
     generate = sub.add_parser("generate")
     generate.add_argument("--slot", default="buffer", choices=["now", "buffer"])
+
+    draft_text = sub.add_parser("draft-text")
+    draft_text.add_argument("--style", default="current", help="Style key, 'current', or 'all'.")
+    draft_text.add_argument("--output-dir", default="data/drafts")
 
     serve = sub.add_parser("serve")
     serve.add_argument("--host", default=None)
@@ -89,6 +94,70 @@ def main(argv: list[str] | None = None) -> None:
             print(pipeline.generate_slot(slot))
         else:
             print(json.dumps(pipeline.generate_buffer(), indent=2, ensure_ascii=False))
+        return
+
+    if args.command == "draft-text":
+        slot = pipeline.schedule.floor_slot(datetime.now())
+        if args.style == "all":
+            style_keys = [style.key for style in pipeline.schedule.rotation]
+        elif args.style == "current":
+            style_keys = [pipeline.schedule.style_for(slot).key]
+        else:
+            style_keys = [args.style]
+        output_dir = Path(args.output_dir)
+        if not output_dir.is_absolute():
+            output_dir = settings.home / output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        results = []
+        for style_key in style_keys:
+            try:
+                style, articles, draft = pipeline.draft_slot_text(style_key, slot)
+            except Exception as exc:
+                results.append({"style_key": style_key, "status": "rejected", "message": str(exc)})
+                continue
+            stem = f"{slot.strftime('%Y%m%dT%H%M%S')}-{_safe_cli_filename(style.key)}"
+            txt_path = output_dir / f"{stem}.txt"
+            json_path = output_dir / f"{stem}.json"
+            txt_path.write_text(draft.transcript, encoding="utf-8")
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "style_key": style.key,
+                        "style": style.label,
+                        "slot_start": slot.isoformat(timespec="seconds"),
+                        "title": draft.title,
+                        "summary": draft.summary,
+                        "warnings": draft.warnings,
+                        "word_count": len(draft.transcript.split()),
+                        "articles": [
+                            {
+                                "id": article.id,
+                                "source": article.source_name,
+                                "title": article.title,
+                                "url": article.url,
+                                "language": article.language,
+                                "region": article.region,
+                            }
+                            for article in articles
+                        ],
+                        "transcript": draft.transcript,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            results.append(
+                {
+                    "style_key": style.key,
+                    "style": style.label,
+                    "status": "ok",
+                    "word_count": len(draft.transcript.split()),
+                    "txt": str(txt_path),
+                    "json": str(json_path),
+                }
+            )
+        print(json.dumps(results, ensure_ascii=False, indent=2))
         return
 
     if args.command == "serve":
@@ -201,3 +270,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "status":
         print(json.dumps(pipeline.db.status_snapshot(), indent=2, ensure_ascii=False))
         return
+
+
+def _safe_cli_filename(value: str) -> str:
+    return "".join(char if char.isalnum() or char in "-_" else "-" for char in value)
