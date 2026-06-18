@@ -471,14 +471,12 @@ def _template_opener(style: StyleSlot) -> str:
 
 
 def _template_segment(style: StyleSlot, index: int, title: str, source: str, text: str) -> str:
-    excerpt = _word_limit(_clean_article_text(text, source), 115)
+    excerpt = _template_excerpt(title, text, source, 95)
     transition = _transition_for(index)
     context_suffix = ""
     if style.language == "en":
-        return (
-            f"{_english_transition_for(index)}, {title}. "
-            f"{_sentence(excerpt)}{context_suffix}"
-        )
+        detail = f" {_sentence(excerpt)}" if excerpt else ""
+        return f"{_english_transition_for(index)}, {title}.{detail}{context_suffix}"
     match style.key:
         case "pote":
             return (
@@ -486,15 +484,11 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
                 f"En clair, {_sentence(_lower_initial_for_flow(excerpt))}"
             )
         case "non_anxiogene":
-            return (
-                f"{transition}, {title}. "
-                f"{_sentence(excerpt)}"
-            )
+            detail = f" {_sentence(excerpt)}" if excerpt else ""
+            return f"{transition}, {title}.{detail}"
         case "anxiogene":
-            return (
-                f"{transition}, {title}. "
-                f"{_sentence(excerpt)}"
-            )
+            detail = f" {_sentence(excerpt)}" if excerpt else ""
+            return f"{transition}, {title}.{detail}"
         case "enfant":
             return _template_child_segment(index, title, source, text)
         case "contexte":
@@ -504,10 +498,8 @@ def _template_segment(style: StyleSlot, index: int, title: str, source: str, tex
                 "À suivre maintenant: les réactions, les décisions concrètes et les effets possibles pour le public romand."
             )
         case _:
-            return (
-                f"{transition}, {title}. "
-                f"{_sentence(excerpt)}{context_suffix}"
-            )
+            detail = f" {_sentence(excerpt)}" if excerpt else ""
+            return f"{transition}, {title}.{detail}{context_suffix}"
 
 
 def _template_context_sentence(style: StyleSlot, index: int) -> str:
@@ -897,6 +889,36 @@ def _usable_template_excerpt(text: str, title: str) -> bool:
         r"\bnewsletter\b",
     )
     return not any(re.search(pattern, normalized) for pattern in noisy_patterns)
+
+
+def _template_excerpt(title: str, text: str, source: str, limit: int) -> str:
+    cleaned = _clean_article_text(text, source)
+    title_normalized = _normalize_for_rules(title)
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", cleaned)
+        if sentence.strip()
+    ]
+    selected: list[str] = []
+    word_count = 0
+    for sentence in sentences:
+        normalized = _normalize_for_rules(sentence)
+        if normalized == title_normalized or normalized in title_normalized:
+            continue
+        if len(sentence.split()) < 4:
+            continue
+        sentence_words = len(sentence.split())
+        if selected and word_count + sentence_words > limit:
+            break
+        selected.append(sentence)
+        word_count += sentence_words
+        if word_count >= limit:
+            break
+    if selected:
+        return " ".join(selected)
+    if _normalize_for_rules(cleaned) == title_normalized:
+        return ""
+    return _word_limit(cleaned, limit)
 
 
 def _clean_article_text(text: str, source: str) -> str:

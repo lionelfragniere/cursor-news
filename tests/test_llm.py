@@ -131,6 +131,38 @@ def test_template_llm_does_not_read_noisy_page_content():
     assert "Mot de passe" not in draft.transcript
 
 
+def test_template_llm_does_not_repeat_title_as_excerpt():
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="Moscow hit by largest drone attack",
+        url="https://example.test",
+        published_at=None,
+        summary="Moscow hit by largest drone attack.",
+        content="",
+        language="en",
+    )
+    style = StyleSlot(key="international_english", label="International English", prompt="", language="en")
+    draft = TemplateLLMClient().generate_bulletin([article], style, datetime.now())
+    assert draft.transcript.count("Moscow hit by largest drone attack") == 1
+
+
+def test_template_llm_keeps_complete_sentences_when_trimming():
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="La Suisse discute une reforme",
+        url="https://example.test",
+        published_at=None,
+        summary="Premiere phrase vraiment complete. " + " ".join(["element"] * 150),
+        content="",
+    )
+    style = StyleSlot(key="suisse", label="Suisse", prompt="")
+    draft = TemplateLLMClient().generate_bulletin([article], style, datetime.now())
+    assert "Premiere phrase vraiment complete." in draft.transcript
+    assert " element." not in draft.transcript
+
+
 def test_template_llm_keeps_french_accents():
     article = Article(
         id=1,

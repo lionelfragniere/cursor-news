@@ -111,6 +111,7 @@ CHILD_UNSUITABLE_PATTERNS = (
 
 LOW_VALUE_ARTICLE_PATTERNS = (
     r"^\W*en direct\b",
+    r"\blive\b",
     r"\blatest news bulletin\b",
     r"\btaxi questions\b",
     r"\bfinale saison\b",
