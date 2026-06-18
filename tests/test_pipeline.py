@@ -238,6 +238,82 @@ def test_pipeline_english_bulletin_uses_only_english_articles(tmp_path: Path, mo
     assert {article.region for article in selected} == {"english"}
 
 
+def test_pipeline_un_bulletin_does_not_backfill_unrelated_english_news(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="UN News", url="https://news.un.org/rss", region="english", priority=100))
+    pipeline.db.upsert_source(FeedSource(name="BBC News - World", url="https://bbc.com/rss", region="english", priority=150))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="UN News",
+            title="UN agencies call for humanitarian access",
+            url="https://news.un.org/en/story",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="UN agencies call for better access to civilians.",
+            content="",
+            language="en",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="BBC News - World",
+            title="Australia announces a tax measure",
+            url="https://bbc.com/story",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="The government outlines a domestic tax plan.",
+            content="",
+            language="en",
+        )
+    )
+
+    selected = pipeline._select_articles("un_relevant")
+
+    assert selected
+    assert [article.source_name for article in selected] == ["UN News"]
+
+
+def test_pipeline_english_selection_skips_world_cup_sports_item(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="BBC News - World", url="https://bbc.com/rss", region="english", priority=150))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="BBC News - World",
+            title="From one to 48 - every World Cup team ranked after first game",
+            url="https://bbc.com/sport",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="All 48 teams at the World Cup have now played once.",
+            content="",
+            language="en",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="BBC News - World",
+            title="UN warns of worsening humanitarian access",
+            url="https://bbc.com/news",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Humanitarian agencies say access is getting harder.",
+            content="",
+            language="en",
+        )
+    )
+
+    selected = pipeline._select_articles("international_english")
+
+    assert [article.title for article in selected] == ["UN warns of worsening humanitarian access"]
+
+
 def test_pipeline_french_bulletin_excludes_english_articles(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
     monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))

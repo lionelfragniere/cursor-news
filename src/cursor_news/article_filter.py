@@ -20,6 +20,9 @@ SPORT_STRONG_PATTERNS = (
     r"\bchampions league\b",
     r"\bligue des champions\b",
     r"\bligue europa\b",
+    r"\bworld cup\b",
+    r"\bfifa\b",
+    r"\buefa\b",
     r"\brugby\b",
     r"\btennis\b",
     r"\broland[- ]garros\b",
@@ -52,6 +55,8 @@ SPORT_CONTEXT_PATTERNS = (
     r"\bjoueuse\b",
     r"\bclub\b",
     r"\bstade\b",
+    r"\bteam ranked\b",
+    r"\branked after first game\b",
 )
 
 SPORT_TEAM_PATTERNS = (
@@ -253,11 +258,11 @@ TOPIC_PATTERNS: dict[str, tuple[str, ...]] = {
 
 
 def is_sports_article(article: Article) -> bool:
-    return is_sports_text(article.title, article.summary, article.content)
+    return is_sports_text(article.title, article.summary, article.content, article.source_name)
 
 
-def is_sports_text(title: str, summary: str = "", content: str = "") -> bool:
-    text = _normalize(" ".join([title, summary, content]))
+def is_sports_text(title: str, summary: str = "", content: str = "", source_name: str = "") -> bool:
+    text = _normalize(" ".join([source_name, title, summary, content]))
     if _matches_any(text, SPORT_STRONG_PATTERNS):
         return True
     context_hits = sum(1 for pattern in SPORT_CONTEXT_PATTERNS if re.search(pattern, text))
@@ -356,8 +361,6 @@ def topic_relevance_score(article: Article, topic_key: str | None) -> int:
     elif topic_key == "un_relevant":
         if source.startswith("un news"):
             score += 22
-        if region == "english":
-            score += 3
     elif topic_key == "international_english":
         if region == "english":
             score += 20
@@ -377,6 +380,8 @@ def filter_articles_for_topic(articles: list[Article], topic_key: str | None, mi
     if topic_key not in TOPIC_PATTERNS:
         return articles
     focused = [article for article in articles if topic_relevance_score(article, topic_key) > 0]
+    if topic_key == "un_relevant":
+        return focused
     return focused if len(focused) >= minimum else articles
 
 

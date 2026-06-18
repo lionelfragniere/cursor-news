@@ -24,7 +24,7 @@ class OllamaLLMClient:
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
-        return self._generate_json(prompt, temperature=0.42, num_predict=2600)
+        return self._generate_json(prompt, temperature=0.42, num_predict=2300)
 
     def revise_bulletin(
         self,
@@ -35,7 +35,7 @@ class OllamaLLMClient:
         issue: str,
     ) -> BulletinDraft:
         prompt = build_revision_prompt(draft, articles, style, slot_start, issue)
-        revised = self._generate_json(prompt, temperature=0.36, num_predict=2600)
+        revised = self._generate_json(prompt, temperature=0.36, num_predict=2300)
         return BulletinDraft(
             title=revised.title,
             summary=revised.summary,
