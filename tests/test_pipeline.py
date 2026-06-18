@@ -1,4 +1,6 @@
 from pathlib import Path
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from cursor_news.models import ArticleInput, BulletinDraft, FeedSource
 from cursor_news.pipeline import CursorNewsPipeline, _draft_quality_issue
@@ -16,11 +18,40 @@ def test_pipeline_generates_with_template_and_tone(tmp_path: Path, monkeypatch):
     settings = load_settings()
     pipeline = CursorNewsPipeline(settings)
     pipeline.init_db()
-    generated = pipeline.generate_buffer()
+    pipeline.db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss", region="suisse-romande"))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Fixture",
+            title="Une nouvelle liaison ferroviaire est annoncée",
+            url="https://example.test/train",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Le canton présente une mesure de mobilité publique.",
+            content="",
+        )
+    )
+    generated = pipeline.generate_buffer(now=datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("Europe/Zurich")))
     assert generated
     current = pipeline.db.current_bulletin()
     assert current is not None
     assert Path(current["audio_path"]).exists()
+
+
+def test_pipeline_skips_empty_slots_without_fallback_audio(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("LLM_PROVIDER", "template")
+    monkeypatch.setenv("TTS_ENGINE", "tone")
+    monkeypatch.setenv("FFMPEG_PATH", "")
+    monkeypatch.setenv("ALLOW_WAV_FALLBACK", "1")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+
+    generated = pipeline.generate_buffer(now=datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("Europe/Zurich")))
+
+    assert generated == []
+    assert pipeline.db.current_bulletin() is None
 
 
 def test_pipeline_article_selection_skips_sports(tmp_path: Path, monkeypatch):

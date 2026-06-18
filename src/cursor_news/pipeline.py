@@ -58,7 +58,10 @@ class CursorNewsPipeline:
                 slot_iso = slot_start.isoformat(timespec="seconds")
                 if self.db.bulletin_exists(slot_iso):
                     continue
-                generated.append(self.generate_slot(slot_start))
+                bulletin_id = self.generate_slot(slot_start)
+                if not bulletin_id:
+                    continue
+                generated.append(bulletin_id)
                 if len(generated) >= self.settings.generate_max_per_tick:
                     break
             self.db.finish_run(run_id, "ok", f"{len(generated)} bulletins generated")
@@ -67,11 +70,13 @@ class CursorNewsPipeline:
             self.db.finish_run(run_id, "error", str(exc))
             raise
 
-    def generate_slot(self, slot_start: datetime) -> str:
+    def generate_slot(self, slot_start: datetime) -> str | None:
         self.db.init()
         slot_iso = slot_start.isoformat(timespec="seconds")
         style = self.schedule.style_for(slot_start)
         articles = self._select_articles(style)
+        if not articles:
+            return None
         draft = self._draft_bulletin(articles, style, slot_start)
         bulletin_id = f"{slot_start.strftime('%Y%m%dT%H%M%S')}-{style.key}-{uuid.uuid4().hex[:8]}"
         self.db.create_bulletin(bulletin_id, slot_iso, style, draft, articles)
