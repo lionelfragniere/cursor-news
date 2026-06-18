@@ -918,6 +918,8 @@ def _template_excerpt(title: str, text: str, source: str, limit: int) -> str:
             break
     if selected:
         return " ".join(selected)
+    if sentences:
+        return ""
     if _normalize_for_rules(cleaned) == title_normalized:
         return ""
     return _word_limit(cleaned, limit)
