@@ -278,7 +278,7 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     )
     if "trop court" in warning_text or "too short" in warning_text:
         return "LLM self-reported a short transcript"
-    if word_count < 320:
+    if word_count < 260:
         return f"LLM returned a short transcript ({word_count} words)"
     for phrase in generic_child_phrases:
         if phrase in transcript:

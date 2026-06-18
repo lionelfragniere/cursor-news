@@ -421,7 +421,7 @@ def test_draft_quality_issue_rejects_short_llm_output():
 
 
 def test_draft_quality_accepts_compact_valid_llm_output():
-    draft = BulletinDraft(title="Compact", summary="", transcript=" ".join(["mot"] * 360))
+    draft = BulletinDraft(title="Compact", summary="", transcript=" ".join(["mot"] * 300))
     assert _draft_quality_issue(draft) is None
 
 
