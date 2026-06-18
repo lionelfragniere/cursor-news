@@ -116,6 +116,8 @@ class CursorNewsPipeline:
         include_english = language == "en"
         if include_english or style_key in {"valais", "suisse_romande", "suisse", "international", "security_world"}:
             pool_size = max(target_articles * 10, 120)
+        if style_key == "un_relevant":
+            pool_size = max(pool_size, 500)
         selected = filter_sports_articles(self.db.list_candidate_articles(pool_size, include_english=include_english))
         selected = _filter_articles_by_language(selected, language)
         if style_key == "enfant":

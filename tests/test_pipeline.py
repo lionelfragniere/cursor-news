@@ -334,6 +334,46 @@ def test_pipeline_un_bulletin_returns_empty_without_official_un_news(tmp_path: P
     assert selected == []
 
 
+def test_pipeline_un_bulletin_searches_deep_enough_for_official_un_news(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="BBC News - World", url="https://bbc.test/rss", region="english", priority=150))
+    pipeline.db.upsert_source(FeedSource(name="UN News - Humanitarian Aid", url="https://news.un.org/rss", region="english", priority=100))
+    for index in range(140):
+        pipeline.db.upsert_article(
+            ArticleInput(
+                source_name="BBC News - World",
+                title=f"World update {index}",
+                url=f"https://bbc.test/{index}",
+                published_at=f"2026-05-17T14:{index % 60:02d}:00+02:00",
+                summary="A global political update is reported.",
+                content="",
+                language="en",
+            )
+        )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="UN News - Humanitarian Aid",
+            title="UN agencies warn humanitarian access is under pressure",
+            url="https://news.un.org/en/humanitarian-access",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="UN agencies say humanitarian teams need safer access to civilians.",
+            content="",
+            language="en",
+        )
+    )
+
+    selected = pipeline._select_articles("un_relevant")
+
+    assert selected
+    assert {article.source_name for article in selected} == {"UN News - Humanitarian Aid"}
+
+
 def test_pipeline_un_bulletin_prefers_official_un_news(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
     monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
