@@ -381,6 +381,9 @@ def filter_articles_for_topic(articles: list[Article], topic_key: str | None, mi
         return articles
     focused = [article for article in articles if topic_relevance_score(article, topic_key) > 0]
     if topic_key == "un_relevant":
+        official_un = [article for article in focused if _normalize(article.source_name).startswith("un news")]
+        if official_un:
+            return official_un
         return focused
     return focused if len(focused) >= minimum else articles
 
