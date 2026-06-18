@@ -37,6 +37,8 @@ SPORT_STRONG_PATTERNS = (
     r"\bhandball\b",
     r"\bvolley\b",
     r"\bhockey\b",
+    r"\bhockeyeurs?\b",
+    r"\bhockeyeuses?\b",
     r"\bmercato\b",
 )
 
@@ -105,6 +107,16 @@ CHILD_UNSUITABLE_PATTERNS = (
     r"\bcontrainte?\b",
     r"\brasee?\b",
     r"\bviolences?\b",
+)
+
+LOW_VALUE_ARTICLE_PATTERNS = (
+    r"^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}[./-]\d{1,2}[./-]\d{4}$",
+    r"^cin[eé]ma\s+\d{1,2}[./-]\d{1,2}[./-]\d{4}$",
+    r"\bla parole est [aà] nous\b",
+    r"\ble journal\s+(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\b",
+    r"\bconnexion e-?mail\b",
+    r"\bmot de passe\b",
+    r"\bvoir toutes les [eé]missions\b",
 )
 
 ANXIETY_STRONG_PATTERNS = (
@@ -272,6 +284,15 @@ def is_sports_text(title: str, summary: str = "", content: str = "", source_name
 
 def filter_sports_articles(articles: list[Article]) -> list[Article]:
     return [article for article in articles if not is_sports_article(article)]
+
+
+def is_low_value_article(article: Article) -> bool:
+    text = _normalize(" ".join([article.title, article.summary[:500]]))
+    return _matches_any(text, LOW_VALUE_ARTICLE_PATTERNS)
+
+
+def filter_low_value_articles(articles: list[Article]) -> list[Article]:
+    return [article for article in articles if not is_low_value_article(article)]
 
 
 def is_child_unsuitable_article(article: Article) -> bool:

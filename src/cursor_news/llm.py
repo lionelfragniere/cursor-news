@@ -948,7 +948,18 @@ def _sentence(text: str) -> str:
     text = text.strip()
     if not text:
         return ""
+    text = _trim_dangling_end(text)
     return text if text[-1] in ".!?" else f"{text}."
+
+
+def _trim_dangling_end(text: str) -> str:
+    dangling = (
+        r"\s+(dans|sur|avec|pour|contre|chez|vers|entre|dont|que|qui|de|du|des|le|la|les|au|aux)$",
+        r"\s+(dans|sur|avec|pour|contre|chez|vers|entre|de)\s+(le|la|les|des|du|un|une|l['’])$",
+    )
+    for pattern in dangling:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    return text.strip(" ,;:")
 
 
 def _normalize_for_rules(text: str) -> str:

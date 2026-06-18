@@ -8,6 +8,7 @@ from .article_filter import (
     diversify_articles_by_topic,
     filter_articles_for_topic,
     filter_child_unsuitable_articles,
+    filter_low_value_articles,
     filter_sports_articles,
     rank_articles_for_topic,
     unique_articles_by_story,
@@ -118,7 +119,9 @@ class CursorNewsPipeline:
             pool_size = max(target_articles * 10, 120)
         if style_key == "un_relevant":
             pool_size = max(pool_size, 500)
-        selected = filter_sports_articles(self.db.list_candidate_articles(pool_size, include_english=include_english))
+        selected = filter_low_value_articles(
+            filter_sports_articles(self.db.list_candidate_articles(pool_size, include_english=include_english))
+        )
         selected = _filter_articles_by_language(selected, language)
         if style_key == "enfant":
             selected = filter_child_unsuitable_articles(selected)
@@ -126,7 +129,9 @@ class CursorNewsPipeline:
         selected = filter_articles_for_topic(selected, ranking_style, minimum=max(3, target_articles // 3))
         if len(selected) < target_articles:
             known_ids = {article.id for article in selected}
-            recent = filter_sports_articles(self.db.list_recent_articles(pool_size, include_english=include_english))
+            recent = filter_low_value_articles(
+                filter_sports_articles(self.db.list_recent_articles(pool_size, include_english=include_english))
+            )
             recent = _filter_articles_by_language(recent, language)
             if style_key == "enfant":
                 recent = filter_child_unsuitable_articles(recent)

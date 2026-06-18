@@ -4,6 +4,7 @@ from cursor_news.article_filter import (
     filter_child_unsuitable_articles,
     filter_sports_articles,
     is_child_unsuitable_article,
+    is_low_value_article,
     is_sports_article,
     rank_articles_for_style,
     story_key,
@@ -53,6 +54,19 @@ def test_sports_article_detects_match_result():
 def test_sports_article_detects_documentary_about_footballer():
     item = article('"Je suis une fleur du mal" : Éric Cantona revient sur son passé de footballeur')
     assert is_sports_article(item)
+
+
+def test_sports_article_detects_hockeyeur_word():
+    item = article("Les hockeyeurs suisses reÃ§us par leurs fans")
+    assert is_sports_article(item)
+
+
+def test_low_value_article_detects_programme_page():
+    item = article(
+        "Lundi 15.06.2026",
+        "Canal9 En direct fr DE Connexion E-mail Mot de passe Voir toutes les Ã©missions",
+    )
+    assert is_low_value_article(item)
 
 
 def test_filter_sports_articles_keeps_general_news():
