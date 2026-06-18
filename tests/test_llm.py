@@ -261,6 +261,28 @@ def test_enforce_source_credit_at_end_removes_inline_sources():
     assert "Source: RFI - Français" not in body
 
 
+def test_enforce_source_credit_removes_llm_source_sentence_variant():
+    article = Article(
+        id=1,
+        source_name="France 24 - Français",
+        title="Un titre",
+        url="https://example.test",
+        published_at=None,
+        summary="",
+        content="",
+    )
+    draft = enforce_source_credit_at_end(
+        draft=BulletinDraft(
+            title="Test",
+            summary="",
+            transcript="Un bulletin court.\n\nLes sources utilisées pour cette édition: France 24, RFI.",
+        ),
+        articles=[article],
+    )
+    assert draft.transcript.count("Sources utilisées pour cette édition:") == 1
+    assert "France 24, RFI" not in draft.transcript
+
+
 def test_enforce_source_credit_formats_long_single_block_and_removes_fillers():
     article = Article(
         id=1,
