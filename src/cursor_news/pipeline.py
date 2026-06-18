@@ -349,7 +349,7 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     for phrase in generic_child_phrases:
         if phrase in transcript:
             return f"LLM returned generic radio filler: {phrase}"
-    if word_count < 600:
+    if word_count < 550:
         return f"LLM returned a short transcript ({word_count} words)"
     repeated = _repeated_paragraph_opening(draft.transcript)
     if repeated:
