@@ -29,7 +29,7 @@ def test_build_prompt_requires_radio_script_not_rss_reading():
     prompt = build_prompt([article], StyleSlot(key="valais", label="Valais", prompt="Local"), datetime.now())
     assert prompt.startswith("/no_think")
     assert "Ne pas réciter les titres RSS" in prompt
-    assert "Choisir 4 à 6 sujets maximum" in prompt
+    assert "Choisir 3 à 5 sujets maximum" in prompt
     assert "Sources utilisées pour cette édition" in prompt
 
 

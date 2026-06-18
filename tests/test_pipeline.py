@@ -551,6 +551,42 @@ def test_pipeline_audio_selection_caps_articles_for_radio_flow(tmp_path: Path, m
     assert len(selected) == 7
 
 
+def test_pipeline_security_selection_does_not_backfill_unrelated_news(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="Canal9", url="https://canal9.test/rss", region="valais", priority=150))
+    pipeline.db.upsert_source(FeedSource(name="RFI - Français", url="https://rfi.test/rss", region="international", priority=100))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Canal9",
+            title="La protection de la vigne",
+            url="https://canal9.test/vigne",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Au printemps, la vigne est vulnérable aux ravageurs.",
+            content="",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="RFI - Français",
+            title="Cyberattaque contre une administration européenne",
+            url="https://rfi.test/cyber",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="Les autorités enquêtent sur une attaque informatique visant des services publics.",
+            content="",
+        )
+    )
+
+    selected = pipeline._select_articles("security_world")
+
+    assert [article.title for article in selected] == ["Cyberattaque contre une administration européenne"]
+
+
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
