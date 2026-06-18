@@ -635,6 +635,11 @@ def test_draft_quality_accepts_radio_length_valid_llm_output():
     assert _draft_quality_issue(draft) is None
 
 
+def test_draft_quality_accepts_compact_local_llm_output():
+    draft = BulletinDraft(title="Format local compact", summary="", transcript=" ".join(["mot"] * 290))
+    assert _draft_quality_issue(draft) is None
+
+
 def test_draft_quality_issue_rejects_self_reported_short_output():
     draft = BulletinDraft(
         title="Court",
