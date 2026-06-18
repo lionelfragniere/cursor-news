@@ -163,6 +163,22 @@ def test_template_llm_keeps_complete_sentences_when_trimming():
     assert " element." not in draft.transcript
 
 
+def test_template_llm_skips_incomplete_sentences_with_false_period():
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="Manifestation importante a Geneve",
+        url="https://example.test",
+        published_at=None,
+        summary="Plusieurs milliers de personnes ont manifeste dans.",
+        content="",
+    )
+    style = StyleSlot(key="suisse_romande", label="Suisse romande", prompt="")
+    draft = TemplateLLMClient().generate_bulletin([article], style, datetime.now())
+    assert "manifeste dans" not in draft.transcript
+    assert "Manifestation importante a Geneve." in draft.transcript
+
+
 def test_template_llm_keeps_french_accents():
     article = Article(
         id=1,

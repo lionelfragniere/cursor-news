@@ -905,6 +905,8 @@ def _template_excerpt(title: str, text: str, source: str, limit: int) -> str:
         normalized = _normalize_for_rules(sentence)
         if normalized == title_normalized or normalized in title_normalized:
             continue
+        if _looks_incomplete_sentence(sentence):
+            continue
         if len(sentence.split()) < 4:
             continue
         sentence_words = len(sentence.split())
@@ -935,6 +937,39 @@ def _clean_article_text(text: str, source: str) -> str:
     text = re.sub(r"\s*Sign up here\b.*$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text)
     return text.strip(" .")
+
+
+def _looks_incomplete_sentence(sentence: str) -> bool:
+    normalized = _normalize_for_rules(sentence).strip(" .,!?:;")
+    if not normalized:
+        return True
+    dangling_endings = (
+        "dans",
+        "sur",
+        "avec",
+        "pour",
+        "contre",
+        "chez",
+        "vers",
+        "entre",
+        "dont",
+        "que",
+        "qui",
+        "de",
+        "du",
+        "des",
+        "le",
+        "la",
+        "les",
+        "au",
+        "aux",
+        "et",
+        "ou",
+        "prenant",
+    )
+    if normalized.endswith(tuple(f" {ending}" for ending in dangling_endings)):
+        return True
+    return bool(re.search(r"\btels que [a-z]+$", normalized))
 
 
 def _remove_source_references(text: str, source: str, preserve_newlines: bool = False) -> str:
