@@ -76,9 +76,9 @@ class TemplateLLMClient:
         lines = [opener]
         selected_articles = articles[:12]
         for index, article in enumerate(selected_articles, start=1):
-            text = article.summary or article.content or article.title
-            text = " ".join(text.split())
-            lines.append(_template_segment(style, index, article.title, article.source_name, text))
+            title = _clean_radio_title(article.title)
+            text = _article_template_text(article)
+            lines.append(_template_segment(style, index, title, article.source_name, text))
         lines.append(_template_closer(style))
         lines.append(_source_credit(selected_articles, language=style.language))
         transcript = "\n\n".join(lines)
@@ -860,6 +860,45 @@ def _child_simplify_text(text: str) -> str:
     return text
 
 
+def _clean_radio_title(title: str) -> str:
+    title = re.sub(r"^\W+", "", title or "").strip()
+    title = re.sub(r"^(?:EN DIRECT|DIRECT|LIVE)\s*[,:\-]\s*", "", title, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", title).strip(" .") or "Information a suivre"
+
+
+def _article_template_text(article: Article) -> str:
+    for candidate in (article.summary, article.content):
+        cleaned = _clean_article_text(candidate or "", article.source_name)
+        if _usable_template_excerpt(cleaned, article.title):
+            return cleaned
+    return _clean_radio_title(article.title)
+
+
+def _usable_template_excerpt(text: str, title: str) -> bool:
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if len(text.split()) < 4:
+        return False
+    normalized = _normalize_for_rules(text)
+    title_normalized = _normalize_for_rules(title)
+    if normalized == title_normalized:
+        return False
+    noisy_patterns = (
+        r"\bconnexion e-?mail\b",
+        r"\bmot de passe\b",
+        r"\bvoir toutes les emissions\b",
+        r"\bpas encore de compte\b",
+        r"\binscrivez-vous\b",
+        r"\bse connecter\b",
+        r"\bcanal9 en direct\b",
+        r"\bvoir toutes les actualites\b",
+        r"\bvoir toutes les editions\b",
+        r"\bcontinue reading\b",
+        r"\bsign up here\b",
+        r"\bnewsletter\b",
+    )
+    return not any(re.search(pattern, normalized) for pattern in noisy_patterns)
+
+
 def _clean_article_text(text: str, source: str) -> str:
     text = _remove_source_references(text, source)
     text = re.sub(r"\bPar\s+[A-ZÉÈÀÂÊÎÔÛÇ][^.,:;]{0,80}\s+©\s+\d{4}\s+AFP\s*", "", text)
@@ -868,6 +907,10 @@ def _clean_article_text(text: str, source: str) -> str:
     text = re.sub(r"\bPar\s+[A-ZÉÈÀÂÊÎÔÛÇ][A-Za-zÀ-ÿ' -]{2,90}\s+avec agences\s+", "", text)
     text = re.sub(r"\bTV5\s+JWPlayer\s+Field\b", "", text)
     text = re.sub(r"©\s+\d{4}\s+AFP\s*", "", text)
+    text = re.sub(r"\s*Continue reading\.?\s*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*•\s*Don['’]t get\b.*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*Don['’]t get\b.*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*Sign up here\b.*$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text)
     return text.strip(" .")
 
@@ -954,7 +997,7 @@ def _sentence(text: str) -> str:
 
 def _trim_dangling_end(text: str) -> str:
     dangling = (
-        r"\s+(dans|sur|avec|pour|contre|chez|vers|entre|dont|que|qui|de|du|des|le|la|les|au|aux)$",
+        r"\s+(dans|sur|avec|pour|contre|chez|vers|entre|dont|que|qui|de|du|des|le|la|les|au|aux|et)$",
         r"\s+(dans|sur|avec|pour|contre|chez|vers|entre|de)\s+(le|la|les|des|du|un|une|l['’])$",
     )
     for pattern in dangling:

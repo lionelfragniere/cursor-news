@@ -114,6 +114,23 @@ def test_template_llm_generates_transcript():
     assert "Source: Fixture" not in draft.transcript
 
 
+def test_template_llm_does_not_read_noisy_page_content():
+    article = Article(
+        id=1,
+        source_name="Canal9 - Actualites",
+        title="Un projet communal est presente",
+        url="https://example.test",
+        published_at=None,
+        summary="",
+        content="Canal9 En direct fr DE Connexion E-mail Mot de passe Voir toutes les emissions Le Journal Lundi 15.06.2026",
+    )
+    style = StyleSlot(key="suisse_romande", label="Suisse romande", prompt="Local")
+    draft = TemplateLLMClient().generate_bulletin([article], style, datetime.now())
+    assert "Un projet communal est presente" in draft.transcript
+    assert "Connexion" not in draft.transcript
+    assert "Mot de passe" not in draft.transcript
+
+
 def test_template_llm_keeps_french_accents():
     article = Article(
         id=1,

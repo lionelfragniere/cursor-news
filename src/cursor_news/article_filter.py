@@ -110,6 +110,12 @@ CHILD_UNSUITABLE_PATTERNS = (
 )
 
 LOW_VALUE_ARTICLE_PATTERNS = (
+    r"^\W*en direct\b",
+    r"\blatest news bulletin\b",
+    r"\btaxi questions\b",
+    r"\bfinale saison\b",
+    r"\ba la une de la presse\b",
+    r"\bvoir toutes les emissions\b",
     r"^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}[./-]\d{1,2}[./-]\d{4}$",
     r"^cin[eé]ma\s+\d{1,2}[./-]\d{1,2}[./-]\d{4}$",
     r"\bla parole est [aà] nous\b",

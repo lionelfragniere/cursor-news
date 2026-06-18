@@ -74,6 +74,11 @@ def test_low_value_article_detects_date_title_with_trailing_spaces():
     assert is_low_value_article(item)
 
 
+def test_low_value_article_detects_live_or_show_pages():
+    assert is_low_value_article(article("En direct : les derniers developpements", ""))
+    assert is_low_value_article(article("Taxi Questions - Finale Saison 9", ""))
+
+
 def test_filter_sports_articles_keeps_general_news():
     politics = article("Le Conseil fédéral présente une réforme de la santé")
     football = article("Football : un transfert majeur annoncé")
