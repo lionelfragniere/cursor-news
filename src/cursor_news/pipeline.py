@@ -337,6 +337,9 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
         "pays neutre",
         "liens historiques et économiques",
         "impact direct ou indirect sur votre quotidien en suisse romande",
+        "influencer notre quotidien",
+        "influence notre quotidien",
+        "s'indépendir",
         "switzerland, as a neutral country",
         "historical and economic ties",
     )
@@ -349,7 +352,7 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     for phrase in generic_child_phrases:
         if phrase in transcript:
             return f"LLM returned generic radio filler: {phrase}"
-    if word_count < 550:
+    if word_count < 420:
         return f"LLM returned a short transcript ({word_count} words)"
     repeated = _repeated_paragraph_opening(draft.transcript)
     if repeated:
