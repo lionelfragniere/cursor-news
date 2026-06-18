@@ -525,6 +525,44 @@ def test_pipeline_french_bulletin_excludes_german_articles(tmp_path: Path, monke
     assert [article.language for article in selected] == ["fr"]
 
 
+def test_pipeline_french_bulletin_excludes_unknown_german_articles(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="Valais", url="https://example.test/rss", region="valais", priority=150))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Die Woche im Oberwallis",
+            url="https://example.test/de-unknown",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="Jeden Freitag präsentiert die Redaktion eine Auswahl der wichtigsten Themen aus dem Oberwallis.",
+            content="",
+            language="unknown",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Valais",
+            title="Le Valais présente une nouvelle mesure",
+            url="https://example.test/fr",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Le canton explique son projet pour les communes.",
+            content="",
+            language="fr",
+        )
+    )
+
+    selected = pipeline._select_articles("valais")
+
+    assert selected
+    assert [article.title for article in selected] == ["Le Valais présente une nouvelle mesure"]
+
+
 def test_pipeline_audio_selection_caps_articles_for_radio_flow(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
     monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))

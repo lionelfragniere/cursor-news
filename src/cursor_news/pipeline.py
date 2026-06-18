@@ -17,6 +17,7 @@ from .article_filter import (
 from .audio import AudioEncoder
 from .database import Database
 from .ingest import FeedIngestor
+from .language import detect_article_language
 from .llm import (
     OllamaLLMClient,
     TemplateLLMClient,
@@ -300,8 +301,17 @@ def _filter_articles_by_language(articles: list[Article], language: str) -> list
     return [
         article
         for article in articles
-        if article.region != "english" and article.language in {"fr", "unknown"}
+        if article.region != "english" and _is_french_bulletin_article(article)
     ]
+
+
+def _is_french_bulletin_article(article: Article) -> bool:
+    if article.language == "fr":
+        return True
+    if article.language in {"en", "de"}:
+        return False
+    detected = detect_article_language(article.title, article.summary, article.content, source_region=article.region)
+    return detected in {"fr", "unknown"}
 
 
 def _infomaniak_metadata_text(item: dict, template: str) -> str:
