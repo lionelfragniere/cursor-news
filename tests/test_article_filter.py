@@ -162,3 +162,14 @@ def test_unique_articles_by_story_drops_same_title_from_regional_network():
 
     assert story_key(rtn) == story_key(rjb)
     assert unique_articles_by_story([rtn, rjb, other]) == [rtn, other]
+
+
+def test_sports_article_detects_rallye():
+    item = article("Rallye du Chablais: le point apres deux journees")
+    assert is_sports_article(item)
+
+
+def test_low_value_article_detects_valais_show_and_weekly_pages():
+    assert is_low_value_article(article("Hoselupf Quiz vom 02.06.2026", ""))
+    assert is_low_value_article(article("Cinema 10.06.2026", ""))
+    assert is_low_value_article(article("L'actualite du haut-Valais de la semaine du 25 mai 2026", ""))
