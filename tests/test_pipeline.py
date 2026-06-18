@@ -443,3 +443,12 @@ def test_draft_quality_issue_rejects_repeated_paragraph_openings():
         transcript="\n\n".join([paragraph] * 4) + " " + " ".join(["mot"] * 900),
     )
     assert _draft_quality_issue(draft) == "LLM returned repetitive paragraph openings: d'abord le canton"
+
+
+def test_draft_quality_rejects_invented_romandy_impact_filler():
+    draft = BulletinDraft(
+        title="Impact invente",
+        summary="",
+        transcript=" ".join(["mot"] * 350) + " La Suisse romande, en tant que pays neutre, doit surveiller ce dossier.",
+    )
+    assert _draft_quality_issue(draft) == "LLM returned generic radio filler: pays neutre"

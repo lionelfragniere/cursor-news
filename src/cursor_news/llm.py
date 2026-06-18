@@ -24,7 +24,7 @@ class OllamaLLMClient:
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
-        return self._generate_json(prompt, temperature=0.42, num_predict=2300)
+        return self._generate_json(prompt, temperature=0.2, num_predict=2300)
 
     def revise_bulletin(
         self,
@@ -35,7 +35,7 @@ class OllamaLLMClient:
         issue: str,
     ) -> BulletinDraft:
         prompt = build_revision_prompt(draft, articles, style, slot_start, issue)
-        revised = self._generate_json(prompt, temperature=0.36, num_predict=2300)
+        revised = self._generate_json(prompt, temperature=0.18, num_predict=2300)
         return BulletinDraft(
             title=revised.title,
             summary=revised.summary,
@@ -277,7 +277,8 @@ Mission:
 - Produire un bulletin d'environ 5 à 7 minutes, entre 650 et 900 mots.
 - Choisir 5 à 7 sujets maximum dans le paquet de sources. Ignore les articles faibles, doublons ou hors sujet.
 - Ouvrir par une accroche sobre qui donne l'angle du bulletin, pas par une formule générique.
-- Pour chaque sujet: lancer l'information, expliquer le contexte utile, puis dire pourquoi cela compte ou ce qu'il faut surveiller.
+- Pour chaque sujet: lancer l'information, expliquer seulement le contexte présent dans les sources, puis dire ce qui est confirmé, prévu ou incertain.
+- N'invente jamais un impact pour la Suisse ou la Suisse romande. Mentionne un effet suisse/romand seulement s'il est explicitement dans l'article.
 - Écrire comme une journaliste radio: fluide, incarné, précis, mais sans dramatiser.
 - Ne pas réciter les titres RSS. Les titres servent à comprendre le sujet, pas à être lus tels quels.
 - Ne pas empiler "D'abord", "Ensuite", "Autre point" à chaque paragraphe. Varie les transitions et laisse respirer le texte.
@@ -325,7 +326,8 @@ Mission:
 - Produce a five- to seven-minute briefing, between 650 and 900 words.
 - Select 5 to 7 items from the source pack. Ignore weak, duplicate, or off-topic items.
 - Open with a focused radio lead, not a generic greeting.
-- For each item: state the news, give the useful context, then explain why it matters or what to watch next.
+- For each item: state the news, give only the useful context present in the sources, then say what remains confirmed, planned or uncertain.
+- Do not invent a local impact for Switzerland or French-speaking Switzerland. Mention a Swiss/Romandy impact only if it is explicit in the source.
 - Sound like a public-service radio journalist: fluent, precise, calm, and factual.
 - Do not read RSS headlines as section titles. Use them only to understand the story.
 - Do not start every paragraph with "First", "Next", or "Also". Vary the transitions and let the script breathe.

@@ -270,6 +270,11 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
         "this is cultural news",
         "leaders are making decisions",
         "the key issue now",
+        "pays neutre",
+        "liens historiques et économiques",
+        "impact direct ou indirect sur votre quotidien en suisse romande",
+        "switzerland, as a neutral country",
+        "historical and economic ties",
     )
     if "trop court" in warning_text or "too short" in warning_text:
         return "LLM self-reported a short transcript"
