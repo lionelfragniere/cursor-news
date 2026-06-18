@@ -287,7 +287,7 @@ def filter_sports_articles(articles: list[Article]) -> list[Article]:
 
 
 def is_low_value_article(article: Article) -> bool:
-    text = _normalize(" ".join([article.title, article.summary[:500]]))
+    text = _normalize(" ".join([article.title, article.summary[:500]])).strip()
     return _matches_any(text, LOW_VALUE_ARTICLE_PATTERNS)
 
 
@@ -411,7 +411,7 @@ def filter_articles_for_topic(articles: list[Article], topic_key: str | None, mi
     if topic_key == "un_relevant":
         official_un = [article for article in focused if _normalize(article.source_name).startswith("un news")]
         return official_un
-    if topic_key == "security_world":
+    if topic_key in {"international", "security_world"}:
         return focused
     return focused if len(focused) >= minimum else articles
 

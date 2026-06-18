@@ -69,6 +69,11 @@ def test_low_value_article_detects_programme_page():
     assert is_low_value_article(item)
 
 
+def test_low_value_article_detects_date_title_with_trailing_spaces():
+    item = article("Mercredi 17.06.2026   ", "")
+    assert is_low_value_article(item)
+
+
 def test_filter_sports_articles_keeps_general_news():
     politics = article("Le Conseil fédéral présente une réforme de la santé")
     football = article("Football : un transfert majeur annoncé")

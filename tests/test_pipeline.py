@@ -624,3 +624,39 @@ def test_draft_quality_rejects_invented_romandy_impact_filler():
         transcript=" ".join(["mot"] * 350) + " La Suisse romande, en tant que pays neutre, doit surveiller ce dossier.",
     )
     assert _draft_quality_issue(draft) == "LLM returned generic radio filler: pays neutre"
+
+
+def test_pipeline_international_selection_does_not_backfill_local_news(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="Canal9", url="https://canal9.test/rss", region="valais", priority=150))
+    pipeline.db.upsert_source(FeedSource(name="RFI - Francais", url="https://rfi.test/rss", region="international", priority=100))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="Canal9",
+            title="Un nouveau projet communal est presente a Sion",
+            url="https://canal9.test/sion",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="La ville presente une mesure locale pour les quartiers.",
+            content="",
+        )
+    )
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="RFI - Francais",
+            title="Europe: les dirigeants discutent d'un nouvel accord",
+            url="https://rfi.test/europe",
+            published_at="2026-05-17T12:10:00+02:00",
+            summary="Une reunion internationale se tient avec plusieurs pays europeens.",
+            content="",
+        )
+    )
+
+    selected = pipeline._select_articles("international")
+
+    assert [article.title for article in selected] == ["Europe: les dirigeants discutent d'un nouvel accord"]
