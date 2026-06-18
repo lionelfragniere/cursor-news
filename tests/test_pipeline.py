@@ -568,7 +568,7 @@ def test_pipeline_security_selection_does_not_backfill_unrelated_news(tmp_path: 
             url="https://canal9.test/vigne",
             published_at="2026-05-17T12:00:00+02:00",
             summary="Au printemps, la vigne est vulnérable aux ravageurs.",
-            content="",
+            content="Liens de page: guerre, conflit, attaque.",
         )
     )
     pipeline.db.upsert_article(

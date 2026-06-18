@@ -288,6 +288,10 @@ def anxiety_score(article: Article) -> int:
     return sum(2 for pattern in ANXIETY_STRONG_PATTERNS if re.search(pattern, text))
 
 
+def _security_summary_score(normalized_text: str) -> int:
+    return sum(2 for pattern in ANXIETY_STRONG_PATTERNS if re.search(pattern, normalized_text))
+
+
 def calm_score(article: Article) -> int:
     text = _normalize(" ".join([article.title, article.summary, article.content]))
     return sum(1 for pattern in CALM_PATTERNS if re.search(pattern, text))
@@ -333,7 +337,10 @@ def rank_articles_for_topic(articles: list[Article], topic_key: str | None) -> l
 def topic_relevance_score(article: Article, topic_key: str | None) -> int:
     if not topic_key:
         return 0
-    text = _normalize(" ".join([article.source_name, article.region, article.title, article.summary, article.content]))
+    if topic_key == "security_world":
+        text = _normalize(" ".join([article.source_name, article.region, article.title, article.summary]))
+    else:
+        text = _normalize(" ".join([article.source_name, article.region, article.title, article.summary, article.content]))
     source = _normalize(article.source_name)
     region = _normalize(article.region)
     score = 0
@@ -367,7 +374,7 @@ def topic_relevance_score(article: Article, topic_key: str | None) -> int:
         if source.startswith("un news"):
             score += 4
     elif topic_key == "security_world":
-        score += min(14, anxiety_score(article) * 2)
+        score += min(14, _security_summary_score(text) * 2)
         if region in {"english", "international", "europe"}:
             score += 6
     return score
