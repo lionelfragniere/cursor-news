@@ -48,6 +48,7 @@ class OllamaLLMClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "think": False,
             "options": {
                 "temperature": temperature,
                 "num_ctx": 8192,

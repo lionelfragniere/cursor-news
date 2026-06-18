@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from cursor_news.llm import (
+    OllamaLLMClient,
     TemplateLLMClient,
     build_prompt,
     enforce_source_credit_at_end,
@@ -47,6 +48,48 @@ def test_build_prompt_english_keeps_un_briefing_in_english():
     assert "Keep the briefing in English" in prompt
     assert "Do not read RSS headlines" in prompt
     assert "Sources used for this edition" in prompt
+
+
+def test_ollama_client_disables_thinking_in_api_payload(monkeypatch):
+    captured: list[dict] = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"response": '{"title":"T","summary":"S","transcript":"Transcript long enough for parsing.","warnings":[]}'}
+
+    class FakeClient:
+        def __init__(self, timeout):
+            self.timeout = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def post(self, url, json):
+            captured.append(json)
+            return FakeResponse()
+
+    monkeypatch.setattr("cursor_news.llm.httpx.Client", FakeClient)
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="A local update",
+        url="https://example.test",
+        published_at=None,
+        summary="A short update.",
+        content="",
+    )
+    client = OllamaLLMClient("http://ollama.test", "qwen3:14b")
+
+    client.generate_bulletin([article], StyleSlot(key="suisse", label="Suisse", prompt=""), datetime.now())
+
+    assert captured
+    assert captured[0]["think"] is False
 
 
 def test_template_llm_generates_transcript():
