@@ -412,12 +412,17 @@ def test_pipeline_audio_selection_caps_articles_for_radio_flow(tmp_path: Path, m
 
     selected = pipeline._select_articles("suisse_romande")
 
-    assert len(selected) == 9
+    assert len(selected) == 7
 
 
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
+
+
+def test_draft_quality_accepts_compact_valid_llm_output():
+    draft = BulletinDraft(title="Compact", summary="", transcript=" ".join(["mot"] * 360))
+    assert _draft_quality_issue(draft) is None
 
 
 def test_draft_quality_issue_rejects_self_reported_short_output():

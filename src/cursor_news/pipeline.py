@@ -85,7 +85,7 @@ class CursorNewsPipeline:
 
     def _select_articles(self, style: StyleSlot | str | None = None) -> list[Article]:
         style_key, language = self._style_selection_context(style)
-        target_articles = min(self.settings.max_articles, 9)
+        target_articles = min(self.settings.max_articles, 7)
         pool_size = max(target_articles * 5, 30)
         include_english = language == "en"
         if include_english or style_key in {"valais", "suisse_romande", "suisse", "international", "security_world"}:
@@ -273,7 +273,7 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     )
     if "trop court" in warning_text or "too short" in warning_text:
         return "LLM self-reported a short transcript"
-    if word_count < 900:
+    if word_count < 320:
         return f"LLM returned a short transcript ({word_count} words)"
     for phrase in generic_child_phrases:
         if phrase in transcript:
