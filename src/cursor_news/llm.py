@@ -24,14 +24,36 @@ class OllamaLLMClient:
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
+        return self._generate_json(prompt, temperature=0.42, num_predict=2600)
+
+    def revise_bulletin(
+        self,
+        draft: BulletinDraft,
+        articles: list[Article],
+        style: StyleSlot,
+        slot_start: datetime,
+        issue: str,
+    ) -> BulletinDraft:
+        prompt = build_revision_prompt(draft, articles, style, slot_start, issue)
+        revised = self._generate_json(prompt, temperature=0.36, num_predict=2600)
+        return BulletinDraft(
+            title=revised.title,
+            summary=revised.summary,
+            transcript=revised.transcript,
+            warnings=[*draft.warnings, *revised.warnings, f"Revision automatique apres controle qualite: {issue}"],
+        )
+
+    def _generate_json(self, prompt: str, temperature: float, num_predict: int) -> BulletinDraft:
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": 0.35,
+                "temperature": temperature,
                 "num_ctx": 8192,
-                "num_predict": 1800,
+                "num_predict": num_predict,
+                "top_p": 0.9,
+                "repeat_penalty": 1.08,
             },
         }
         if self.json_format:
@@ -150,45 +172,127 @@ def enforce_source_credit_at_end(draft: BulletinDraft, articles: list[Article], 
 
 
 def build_prompt(articles: list[Article], style: StyleSlot, slot_start: datetime) -> str:
-    article_block = "\n\n".join(article.prompt_text() for article in articles)
+    article_block = _article_block(articles)
     language = getattr(style, "language", "fr")
     if language == "en":
-        language_instruction = (
-            "Final language: English. Write the title, summary and transcript in fluent radio English, "
-            "even if some source metadata is in French."
-        )
-        source_credit_form = "Sources used for this edition: ..."
-    else:
-        language_instruction = "Langue finale: français. Écris le titre, le résumé et le transcript en français naturel."
-        source_credit_form = "Sources utilisées pour cette édition: ..."
+        return _build_english_prompt(article_block, style, slot_start)
+    return _build_french_prompt(article_block, style, slot_start)
+
+
+def build_revision_prompt(
+    draft: BulletinDraft,
+    articles: list[Article],
+    style: StyleSlot,
+    slot_start: datetime,
+    issue: str,
+) -> str:
+    article_block = _article_block(articles)
+    original = draft.transcript.strip()
+    if getattr(style, "language", "fr") == "en":
+        return f"""
+You are the senior editor of Cursor News. A first draft failed the quality check: {issue}
+
+Rewrite the bulletin from scratch as a fluent public-service radio script in English.
+
+Mandatory constraints:
+- Keep only facts supported by the source pack.
+- Keep the same topic: {style.label}.
+- Write 900 to 1250 words, with 6 to 9 developed items.
+- The script will be read aloud by text-to-speech: use clear punctuation, natural rhythm, and no bullet points.
+- Do not read RSS headlines as section titles. Turn them into spoken leads.
+- Do not mention media names inside the body. Put source credits only in the final sentence.
+- Avoid repeated paragraph openings and generic filler.
+- Output valid JSON only.
+
+Slot: {slot_start.isoformat()}
+Editorial brief: {style.prompt}
+
+Source pack:
+{article_block}
+
+First draft to replace:
+{original}
+
+JSON shape:
+{{
+  "title": "short title",
+  "summary": "one-sentence summary",
+  "transcript": "full script to read on air",
+  "warnings": []
+}}
+
+/no_think
+""".strip()
     return f"""
-Tu es la rédaction de Cursor News, une web-radio d'actualités en français pour la Suisse romande et la France.
+Tu es la rédactrice en chef de Cursor News. Un premier texte a échoué au contrôle qualité: {issue}
+
+Réécris entièrement le bulletin en français naturel, comme un vrai script radio de service public.
+
+Contraintes obligatoires:
+- Garde uniquement les faits présents dans le paquet de sources.
+- Garde le même sujet: {style.label}.
+- Écris 900 à 1250 mots, avec 6 à 9 sujets développés.
+- Le texte sera lu à voix haute par une synthèse vocale: ponctuation claire, rythme naturel, phrases pas trop longues.
+- Ne lis pas les titres RSS comme des intertitres. Transforme-les en lancements parlés.
+- Ne cite aucun média dans le corps du bulletin. Les sources vont seulement dans la toute dernière phrase.
+- Évite les débuts de paragraphes répétitifs et les phrases de remplissage.
+- Réponds uniquement en JSON valide.
 
 Créneau: {slot_start.isoformat()}
-Sujet: {style.label}
-Langue: {language_instruction}
 Consigne éditoriale: {style.prompt}
 
-Objectif:
-- Écrire un bulletin radio d'environ 8 minutes, environ 980 à 1240 mots.
-- Construire 10 à 14 sujets courts si assez d'articles sont disponibles.
-- Développer chaque sujet en 70 à 100 mots pour éviter un bulletin trop court.
-- Ne pas inventer de faits absents des sources.
-- Ne pas citer les sources au milieu des sujets: pas de "selon Franceinfo", pas de "source:", pas de nom de média dans chaque transition.
-- Regrouper les crédits de sources uniquement dans la toute dernière phrase, sous la forme: "{source_credit_form}".
-- Garder une diction naturelle pour une synthèse vocale.
-- Distinguer clairement les faits confirmés et les incertitudes.
-- Adapter le bulletin au sujet demandé sans changer les faits.
-- Écrire comme un vrai bulletin radio fluide, pas comme une liste mécanique.
-- Exclure les sujets strictement sportifs: résultats, matches, transferts, changements d'entraîneur, nominations de coach, compétitions et classements.
-- Éviter les phrases de remplissage ou d'explication méta comme "dit simplement", "il y a une situation à comprendre", "à ce stade l'important est", ou "l'enjeu maintenant".
-- Structurer le transcript en paragraphes courts séparés par une ligne vide: introduction, puis un paragraphe par sujet, puis conclusion.
-- Ne pas écrire "Point 1", "Sujet 1", "Alerte 1" ou d'autre numérotation visible.
-- Le bulletin doit rester centré sur le sujet "{style.label}". Si un article est hors sujet, ignore-le plutôt que de diluer le flash.
-- Pour les sujets ONU, relie les faits aux agences, droits humains, aide humanitaire, paix et sécurité ou diplomatie multilatérale quand c'est pertinent.
-- Pour la situation sécuritaire mondiale, couvre les conflits, crises, cybermenaces et risques géopolitiques sans sensationnalisme.
+Paquet de sources:
+{article_block}
 
-Articles disponibles:
+Premier texte à remplacer:
+{original}
+
+Forme JSON:
+{{
+  "title": "titre court",
+  "summary": "résumé en une phrase",
+  "transcript": "texte complet à lire à l'antenne",
+  "warnings": []
+}}
+
+/no_think
+""".strip()
+
+
+def _build_french_prompt(article_block: str, style: StyleSlot, slot_start: datetime) -> str:
+    guidance = _subject_guidance(style)
+    return f"""
+Tu es la rédactrice en chef et présentatrice de Cursor News, un flash radio d'actualité pour la Suisse romande.
+
+Le texte sera lu tel quel par une voix de synthèse. Écris donc pour l'oreille: phrases nettes, ponctuation utile, transitions naturelles, aucune mise en page destinée à être vue.
+
+Créneau: {slot_start.isoformat()}
+Sujet du flash: {style.label}
+Consigne éditoriale: {style.prompt}
+Angle spécifique: {guidance}
+
+Mission:
+- Produire un bulletin d'environ 8 minutes, entre 980 et 1240 mots.
+- Choisir 6 à 9 sujets maximum dans le paquet de sources. Ignore les articles faibles, doublons ou hors sujet.
+- Ouvrir par une accroche sobre qui donne l'angle du bulletin, pas par une formule générique.
+- Pour chaque sujet: lancer l'information, expliquer le contexte utile, puis dire pourquoi cela compte ou ce qu'il faut surveiller.
+- Écrire comme une journaliste radio: fluide, incarné, précis, mais sans dramatiser.
+- Ne pas réciter les titres RSS. Les titres servent à comprendre le sujet, pas à être lus tels quels.
+- Ne pas empiler "D'abord", "Ensuite", "Autre point" à chaque paragraphe. Varie les transitions et laisse respirer le texte.
+- Ne pas inventer de chiffres, dates, citations, causalités ou réactions absentes des sources.
+- Distinguer clairement ce qui est confirmé, annoncé, prévu, contesté ou encore incertain.
+- Exclure le sport strict: résultats, matches, transferts, entraîneurs, compétitions, classements.
+- Ne cite aucun média dans les sujets: pas de "selon", pas de "source:", pas de nom de journal dans les transitions.
+- Mets les crédits de sources uniquement dans la dernière phrase, exactement sous la forme: "Sources utilisées pour cette édition: ...".
+- Termine par une conclusion courte qui ferme le flash sans slogan.
+
+Interdits de style:
+- Pas de numérotation visible: "Point 1", "Sujet 1", "Alerte 1".
+- Pas de phrases méta ou creuses: "il y a une situation à comprendre", "dit simplement", "l'enjeu maintenant", "ce dossier montre que".
+- Pas de paragraphe qui se contente de répéter une catégorie comme "une information culturelle" ou "des responsables prennent des décisions".
+- Pas de markdown, pas de listes à puces, pas d'indications de respiration ou de régie.
+
+Paquet de sources:
 {article_block}
 
 Réponds uniquement en JSON valide avec cette forme:
@@ -201,6 +305,95 @@ Réponds uniquement en JSON valide avec cette forme:
 
 /no_think
 """.strip()
+
+
+def _build_english_prompt(article_block: str, style: StyleSlot, slot_start: datetime) -> str:
+    guidance = _subject_guidance(style)
+    return f"""
+You are the senior editor and presenter of Cursor News, a concise public-service radio briefing.
+
+The transcript will be read aloud by text-to-speech. Write for the ear: clean sentences, natural rhythm, useful punctuation, and no visual formatting.
+
+Slot: {slot_start.isoformat()}
+Briefing topic: {style.label}
+Editorial brief: {style.prompt}
+Specific angle: {guidance}
+
+Mission:
+- Produce an eight-minute briefing, between 980 and 1240 words.
+- Select 6 to 9 items from the source pack. Ignore weak, duplicate, or off-topic items.
+- Open with a focused radio lead, not a generic greeting.
+- For each item: state the news, give the useful context, then explain why it matters or what to watch next.
+- Sound like a public-service radio journalist: fluent, precise, calm, and factual.
+- Do not read RSS headlines as section titles. Use them only to understand the story.
+- Do not start every paragraph with "First", "Next", or "Also". Vary the transitions and let the script breathe.
+- Do not invent numbers, dates, quotes, causes, or reactions that are not in the sources.
+- Clearly separate confirmed facts, announcements, plans, disputed claims, and uncertainties.
+- Exclude pure sports stories: results, matches, transfers, coaches, competitions, rankings.
+- Do not mention media names in the body: no "according to", no "source:", no outlet name in transitions.
+- Put source credits only in the final sentence, exactly as: "Sources used for this edition: ...".
+- Finish with a short closing line, without a slogan.
+
+Style bans:
+- No visible numbering: "Point 1", "Item 1", "Alert 1".
+- No generic filler: "the key issue now", "this is a situation to understand", "in simple terms".
+- No paragraph that only repeats a category such as "this is cultural news" or "leaders are making decisions".
+- No markdown, no bullet points, no production notes.
+
+Source pack:
+{article_block}
+
+Return valid JSON only, in this shape:
+{{
+  "title": "short title",
+  "summary": "one-sentence summary",
+  "transcript": "full script to read on air",
+  "warnings": []
+}}
+
+/no_think
+""".strip()
+
+
+def _article_block(articles: list[Article]) -> str:
+    return "\n\n".join(_article_prompt_text(index, article) for index, article in enumerate(articles, start=1))
+
+
+def _article_prompt_text(index: int, article: Article) -> str:
+    body = article.content or article.summary
+    body = " ".join(body.split())
+    if len(body) > 900:
+        body = body[:900].rsplit(" ", 1)[0] + "..."
+    return (
+        f"Article A{index:02d}\n"
+        f"- Source: {article.source_name}\n"
+        f"- Region: {article.region}\n"
+        f"- Detected language: {article.language}\n"
+        f"- Title: {article.title}\n"
+        f"- URL: {article.url}\n"
+        f"- Date: {article.published_at or 'unknown'}\n"
+        f"- Content: {body}"
+    )
+
+
+def _subject_guidance(style: StyleSlot) -> str:
+    match style.key:
+        case "suisse_romande":
+            return "Priorise les effets concrets pour les cantons romands, les services publics, l'économie locale, les transports, la santé, l'école et la vie culturelle."
+        case "valais":
+            return "Garde une focale valaisanne: communes, canton, montagne, énergie, climat, tourisme, infrastructures, santé et décisions politiques locales."
+        case "suisse":
+            return "Explique ce qui change à l'échelle fédérale et pourquoi cela peut concerner la Suisse romande."
+        case "international":
+            return "Sélectionne les grands faits mondiaux utiles à comprendre depuis la Suisse romande, avec du contexte plutôt qu'une simple succession de pays."
+        case "un_relevant":
+            return "Keep the briefing in English and connect the news to UN agencies, humanitarian access, human rights, peace and security, global health, refugees, climate, or multilateral diplomacy when relevant."
+        case "international_english":
+            return "Keep the briefing in English and focus on major global developments with clear context for listeners following international affairs."
+        case "security_world":
+            return "Couvre les risques de sécurité sans sensationnalisme: conflits, crises humanitaires, cybermenaces, tensions militaires, sécurité civile et décisions diplomatiques."
+        case _:
+            return "Reste centré sur le sujet annoncé et privilégie les informations les plus utiles pour l'auditeur."
 
 
 def parse_json_object(raw: str) -> dict:

@@ -313,6 +313,32 @@ def test_pipeline_french_bulletin_excludes_german_articles(tmp_path: Path, monke
     assert [article.language for article in selected] == ["fr"]
 
 
+def test_pipeline_audio_selection_caps_articles_for_radio_flow(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "12")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss", priority=100))
+    for index in range(12):
+        pipeline.db.upsert_article(
+            ArticleInput(
+                source_name="Fixture",
+                title=f"Information locale importante {index}",
+                url=f"https://example.test/{index}",
+                published_at=f"2026-05-17T12:{index:02d}:00+02:00",
+                summary="Le canton presente une decision avec des effets concrets.",
+                content="",
+            )
+        )
+
+    selected = pipeline._select_articles("suisse_romande")
+
+    assert len(selected) == 9
+
+
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
@@ -326,3 +352,13 @@ def test_draft_quality_issue_rejects_self_reported_short_output():
         warnings=["Le bulletin radio est trop court."],
     )
     assert _draft_quality_issue(draft) == "LLM self-reported a short transcript"
+
+
+def test_draft_quality_issue_rejects_repeated_paragraph_openings():
+    paragraph = "D'abord, le canton annonce une decision importante pour les habitants et les communes concernees."
+    draft = BulletinDraft(
+        title="Repetition",
+        summary="",
+        transcript="\n\n".join([paragraph] * 4) + " " + " ".join(["mot"] * 900),
+    )
+    assert _draft_quality_issue(draft) == "LLM returned repetitive paragraph openings: d'abord le canton"

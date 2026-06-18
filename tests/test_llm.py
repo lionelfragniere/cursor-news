@@ -1,12 +1,52 @@
 from datetime import datetime
 
-from cursor_news.llm import TemplateLLMClient, enforce_source_credit_at_end, parse_json_object, repair_french_accents
+from cursor_news.llm import (
+    TemplateLLMClient,
+    build_prompt,
+    enforce_source_credit_at_end,
+    parse_json_object,
+    repair_french_accents,
+)
 from cursor_news.models import Article, BulletinDraft, StyleSlot
 
 
 def test_parse_json_object_from_fenced_response():
     parsed = parse_json_object('```json\n{"title":"A","summary":"B","transcript":"C","warnings":[]}\n```')
     assert parsed["title"] == "A"
+
+
+def test_build_prompt_requires_radio_script_not_rss_reading():
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="Le Valais annonce une nouvelle mesure",
+        url="https://example.test",
+        published_at=None,
+        summary="Le canton presente une mesure pour les communes.",
+        content="",
+    )
+    prompt = build_prompt([article], StyleSlot(key="valais", label="Valais", prompt="Local"), datetime.now())
+    assert "Ne pas réciter les titres RSS" in prompt
+    assert "Choisir 6 à 9 sujets maximum" in prompt
+    assert "Sources utilisées pour cette édition" in prompt
+
+
+def test_build_prompt_english_keeps_un_briefing_in_english():
+    article = Article(
+        id=1,
+        source_name="UN News",
+        title="UN agencies call for humanitarian access",
+        url="https://example.test",
+        published_at=None,
+        summary="UN agencies say aid teams need safer access.",
+        content="",
+        region="english",
+        language="en",
+    )
+    prompt = build_prompt([article], StyleSlot(key="un_relevant", label="UN / ONU", prompt="UN focus", language="en"), datetime.now())
+    assert "Keep the briefing in English" in prompt
+    assert "Do not read RSS headlines" in prompt
+    assert "Sources used for this edition" in prompt
 
 
 def test_template_llm_generates_transcript():
