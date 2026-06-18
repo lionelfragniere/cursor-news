@@ -277,6 +277,32 @@ def test_pipeline_un_bulletin_does_not_backfill_unrelated_english_news(tmp_path:
     assert [article.source_name for article in selected] == ["UN News"]
 
 
+def test_pipeline_un_bulletin_returns_empty_without_official_un_news(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_STATIC_DIR", str(Path.cwd() / "src" / "cursor_news" / "static"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    settings = load_settings()
+    pipeline = CursorNewsPipeline(settings)
+    pipeline.init_db()
+    pipeline.db.upsert_source(FeedSource(name="The Guardian - World", url="https://guardian.test/rss", region="english", priority=150))
+    pipeline.db.upsert_article(
+        ArticleInput(
+            source_name="The Guardian - World",
+            title="Middle East humanitarian talks continue",
+            url="https://guardian.test/story",
+            published_at="2026-05-17T12:00:00+02:00",
+            summary="Diplomats discuss humanitarian access and human rights.",
+            content="",
+            language="en",
+        )
+    )
+
+    selected = pipeline._select_articles("un_relevant")
+
+    assert selected == []
+
+
 def test_pipeline_un_bulletin_prefers_official_un_news(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
     monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
