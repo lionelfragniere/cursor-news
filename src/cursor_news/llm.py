@@ -473,8 +473,7 @@ def _template_opener(style: StyleSlot) -> str:
 def _template_segment(style: StyleSlot, index: int, title: str, source: str, text: str) -> str:
     excerpt = _word_limit(_clean_article_text(text, source), 115)
     transition = _transition_for(index)
-    context = _template_context_sentence(style, index)
-    context_suffix = f" {context}" if context else ""
+    context_suffix = ""
     if style.language == "en":
         return (
             f"{_english_transition_for(index)}, {title}. "

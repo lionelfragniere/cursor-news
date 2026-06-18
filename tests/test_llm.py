@@ -168,6 +168,25 @@ def test_template_llm_removes_source_mentions_from_rss_summary_body():
     assert draft.transcript.endswith("Sources utilisées pour cette édition: Libération - Tous les articles.")
 
 
+def test_template_llm_does_not_add_generic_security_context():
+    article = Article(
+        id=1,
+        source_name="Fixture",
+        title="Cyberattaque contre une administration européenne",
+        url="https://example.test",
+        published_at=None,
+        summary="Les autorités enquêtent sur une attaque informatique visant des services publics.",
+        content="",
+    )
+    draft = TemplateLLMClient().generate_bulletin(
+        [article],
+        StyleSlot(key="security_world", label="Situation sécuritaire mondiale", prompt=""),
+        datetime.now(),
+    )
+    assert "Le point à suivre est" not in draft.transcript
+    assert "confirmations indépendantes" not in draft.transcript
+
+
 def test_template_llm_pote_tone_flows_after_en_clair():
     article = Article(
         id=1,
