@@ -129,7 +129,7 @@ def load_settings() -> Settings:
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"),
         ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
         ollama_timeout_seconds=max(60.0, float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "600"))),
-        ollama_json_format=_as_bool(os.getenv("OLLAMA_JSON_FORMAT"), False),
+        ollama_json_format=_as_bool(os.getenv("OLLAMA_JSON_FORMAT"), True),
         tts_engine=os.getenv("TTS_ENGINE", "piper").lower(),
         tts_model_name=os.getenv("TTS_MODEL_NAME") or os.getenv("COQUI_MODEL_NAME", "models/piper/fr_FR-siwis-medium/fr_FR-siwis-medium.onnx"),
         edge_tts_voice=os.getenv("EDGE_TTS_VOICE", "fr-CH-ArianeNeural"),

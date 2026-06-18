@@ -27,6 +27,7 @@ def test_build_prompt_requires_radio_script_not_rss_reading():
         content="",
     )
     prompt = build_prompt([article], StyleSlot(key="valais", label="Valais", prompt="Local"), datetime.now())
+    assert prompt.startswith("/no_think")
     assert "Ne pas réciter les titres RSS" in prompt
     assert "Choisir 6 à 9 sujets maximum" in prompt
     assert "Sources utilisées pour cette édition" in prompt
@@ -45,6 +46,7 @@ def test_build_prompt_english_keeps_un_briefing_in_english():
         language="en",
     )
     prompt = build_prompt([article], StyleSlot(key="un_relevant", label="UN / ONU", prompt="UN focus", language="en"), datetime.now())
+    assert prompt.startswith("/no_think")
     assert "Keep the briefing in English" in prompt
     assert "Do not read RSS headlines" in prompt
     assert "Sources used for this edition" in prompt
@@ -90,6 +92,7 @@ def test_ollama_client_disables_thinking_in_api_payload(monkeypatch):
 
     assert captured
     assert captured[0]["think"] is False
+    assert captured[0]["format"] == "json"
 
 
 def test_template_llm_generates_transcript():

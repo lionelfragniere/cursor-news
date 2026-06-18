@@ -16,7 +16,7 @@ class LLMClient(Protocol):
 
 
 class OllamaLLMClient:
-    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = False):
+    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = True):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
@@ -191,6 +191,7 @@ def build_revision_prompt(
     original = draft.transcript.strip()
     if getattr(style, "language", "fr") == "en":
         return f"""
+/no_think
 You are the senior editor of Cursor News. A first draft failed the quality check: {issue}
 
 Rewrite the bulletin from scratch as a fluent public-service radio script in English.
@@ -222,9 +223,9 @@ JSON shape:
   "warnings": []
 }}
 
-/no_think
 """.strip()
     return f"""
+/no_think
 Tu es la rédactrice en chef de Cursor News. Un premier texte a échoué au contrôle qualité: {issue}
 
 Réécris entièrement le bulletin en français naturel, comme un vrai script radio de service public.
@@ -256,13 +257,13 @@ Forme JSON:
   "warnings": []
 }}
 
-/no_think
 """.strip()
 
 
 def _build_french_prompt(article_block: str, style: StyleSlot, slot_start: datetime) -> str:
     guidance = _subject_guidance(style)
     return f"""
+/no_think
 Tu es la rédactrice en chef et présentatrice de Cursor News, un flash radio d'actualité pour la Suisse romande.
 
 Le texte sera lu tel quel par une voix de synthèse. Écris donc pour l'oreille: phrases nettes, ponctuation utile, transitions naturelles, aucune mise en page destinée à être vue.
@@ -304,13 +305,13 @@ Réponds uniquement en JSON valide avec cette forme:
   "warnings": []
 }}
 
-/no_think
 """.strip()
 
 
 def _build_english_prompt(article_block: str, style: StyleSlot, slot_start: datetime) -> str:
     guidance = _subject_guidance(style)
     return f"""
+/no_think
 You are the senior editor and presenter of Cursor News, a concise public-service radio briefing.
 
 The transcript will be read aloud by text-to-speech. Write for the ear: clean sentences, natural rhythm, useful punctuation, and no visual formatting.
@@ -352,7 +353,6 @@ Return valid JSON only, in this shape:
   "warnings": []
 }}
 
-/no_think
 """.strip()
 
 
