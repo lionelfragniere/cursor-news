@@ -1,65 +1,70 @@
-# Cursor News sur laptop Ubuntu
+# Cursor News On Ubuntu Laptop
 
-Ce guide prépare un laptop Ubuntu Desktop pour faire tourner Cursor News en autonomie:
+This guide prepares an Ubuntu Desktop laptop to run Cursor News unattended.
 
-- scrape RSS régulier;
-- génération de bulletins toutes les 10 minutes;
-- voix féminine française via Edge TTS;
-- publication GCP de `current/live.mp3`, du transcript et des news scrappées;
-- site Cloud Run toujours alimenté par les fichiers publics du bucket GCS.
+The laptop handles:
 
-## OS recommandé
+- RSS ingestion;
+- SQLite article storage;
+- hourly topic bulletin generation;
+- female French and English TTS voices through Edge TTS;
+- MP3 generation in mono 64 kbps;
+- upload of public JSON, transcripts and audio files to GCP.
 
-Installe Ubuntu Desktop 26.04 LTS sur le laptop serveur. C'est la dernière LTS Desktop disponible, avec cinq ans de mises à jour de sécurité et maintenance gratuites. Ubuntu recommande au minimum un processeur double coeur 2 GHz, 6 Go de RAM, 25 Go de disque, un port USB et une connexion Internet.
+## Recommended OS
 
-Sources:
+Ubuntu Desktop LTS is the recommended server OS for the laptop. It is simpler
+than Windows Server, friendlier than a minimal server install, and still easy to
+manage over SSH.
 
-- https://ubuntu.com/download/desktop
-- https://docs.cloud.google.com/sdk/docs/install-sdk
+## 1. Prepare The USB Key From Windows
 
-## 1. Préparer la clé USB depuis ce PC Windows
-
-Depuis `D:\Cursor News`:
+From `D:\Cursor News`:
 
 ```cmd
 scripts\prepare_ubuntu_usb_windows.cmd
 ```
 
-Le script télécharge l'ISO officielle Ubuntu Desktop 26.04 LTS et affiche le hash SHA256 local ainsi que le hash officiel attendu. Il n'écrit pas sur la clé USB.
+The script downloads the official Ubuntu Desktop ISO and prints the local
+SHA256 hash. It does not write to the USB key.
 
-Ensuite:
+Then use Rufus or BalenaEtcher to flash the ISO and install Ubuntu on the
+laptop.
 
-1. Ouvre Rufus ou BalenaEtcher.
-2. Sélectionne `ubuntu-26.04-desktop-amd64.iso`.
-3. Choisis la clé USB cible.
-4. Démarre le laptop sur la clé USB.
-5. Installe Ubuntu Desktop.
+## 2. Prepare Ubuntu
 
-## 2. Réglages Ubuntu après installation
+Keep the laptop plugged in. Disable automatic sleep in Ubuntu settings.
 
-Garde le laptop branché au secteur. Dans les réglages Ubuntu, désactive la mise en veille automatique et vérifie que la connexion réseau revient bien après redémarrage.
-
-Option serveur dédié, si le laptop doit rester allumé même écran fermé:
+Optional, for a dedicated server laptop:
 
 ```bash
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
 
-## 3. Copier le projet
+Enable SSH if you want to manage it from another machine:
 
-Copie ce dossier sur le laptop, par exemple dans:
+```bash
+sudo apt update
+sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+sudo ufw allow OpenSSH || true
+```
+
+## 3. Clone Or Copy The Project
+
+Recommended path:
 
 ```text
 ~/Cursor News
 ```
 
-Les dossiers et fichiers importants à migrer sont:
+Files worth preserving during migrations:
 
 - `.env`
 - `config/`
-- `data/` si tu veux garder l'historique existant
+- `data/`, if you want the local article history
 
-Sur Ubuntu, vérifie surtout ces valeurs dans `.env`:
+Ubuntu `.env` basics:
 
 ```env
 CURSOR_NEWS_HOME=.
@@ -70,113 +75,83 @@ GCP_BUCKET=gs://cursor-news-radio-20260517-audio
 GCP_PUBLIC_BASE_URL=https://storage.googleapis.com/cursor-news-radio-20260517-audio
 TTS_ENGINE=edge
 EDGE_TTS_VOICE=fr-CH-ArianeNeural
-OLLAMA_MODEL=qwen3:14b
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=gemma3:12b
+OLLAMA_TIMEOUT_SECONDS=1800
 ```
 
-Si `.env` vient directement de Windows, remplace aussi toute valeur du type `tools\ffmpeg\bin\ffmpeg.exe` par une valeur vide:
+## 4. Install Dependencies
 
-```bash
-sed -i 's|^FFMPEG_PATH=.*|FFMPEG_PATH=|' .env
-sed -i 's|^GCLOUD_PATH=.*|GCLOUD_PATH=gcloud|' .env
-```
-
-Avec `FFMPEG_PATH=` l'application utilise automatiquement le `ffmpeg` installé par `apt`.
-
-## 4. Installer les dépendances
-
-Depuis le dossier du projet:
+From the project root:
 
 ```bash
 bash scripts/bootstrap_ubuntu.sh
 ```
 
-Le script installe:
-
-- `ffmpeg`;
-- `uv`;
-- Google Cloud CLI;
-- Ollama;
-- Python 3.10 via `uv`;
-- les dépendances Python du projet.
-
-Puis configure GCP et le modèle local:
+Then run the one-time account/model setup:
 
 ```bash
 gcloud auth login
 gcloud config set project cursor-news-radio-20260517
-ollama pull qwen3:14b
+ollama pull gemma3:12b
 ```
 
-## 5. Test manuel complet
+## 5. Manual Tick
 
-Lance un cycle complet:
+Run one full cycle:
 
 ```bash
 bash scripts/run_tick_ubuntu.sh
 ```
 
-Ce cycle fait:
+The tick ingests RSS, updates the database, generates needed bulletins, renders
+audio and publishes the public files.
 
-1. ingestion RSS;
-2. génération du tampon de bulletins;
-3. création audio MP3;
-4. publication GCP de l'audio courant, du manifest et des news.
-
-Vérifie ensuite:
+Check the server:
 
 ```bash
 bash scripts/check_ubuntu_server.sh
 ```
 
-## 6. Automatisation 6 fois par heure
+## 6. Hourly Automation
 
-Installe le timer systemd utilisateur:
+Install the systemd user timer:
 
 ```bash
 bash scripts/install_systemd_ubuntu.sh
 ```
 
-Le timer lance `cursor-news tick --publish-gcp` à `00, 10, 20, 30, 40, 50` de chaque heure. Il utilise `Persistent=true`, donc un tick manqué est rattrapé après redémarrage.
-
-Commandes utiles:
+Useful commands:
 
 ```bash
-systemctl --user status cursor-news-tick.timer
+systemctl --user status cursor-news-tick.timer --no-pager
 systemctl --user list-timers cursor-news-tick.timer
 journalctl --user -u cursor-news-tick.service -n 120 --no-pager
 ```
 
-## 7. Site public
+The timer runs at the start of each hour. It also performs a safe
+`git pull --ff-only` before each tick when the working tree is clean.
 
-Le site Cloud Run sert l'interface. Les données dynamiques viennent du bucket:
+## 7. Public Site
+
+The public site is:
+
+```text
+https://cursor.fragniere.li/
+```
+
+Dynamic assets are published to the GCS bucket:
 
 - `current/news.json`
 - `current/manifest.json`
 - `current/live.mp3`
 - `bulletins/{id}.mp3`
 
-La page publique actuelle est:
+## 8. Notes
 
-```text
-https://cursor-news-player-801987419922.europe-west6.run.app
-```
-
-## 8. Inclusivité
-
-Le site expose déjà:
-
-- lecteur audio;
-- transcript du bulletin courant;
-- historique d'articles filtrable;
-- filtre enfant;
-- filtre tension;
-- masquage des articles lus.
-
-Les prochaines améliorations utiles:
-
-- mode texte agrandi;
-- contraste renforcé;
-- résumé très simple pour chaque article;
-- filtre "bonnes nouvelles / solutions";
-- version audio courte de chaque article;
-- clavier uniquement, avec focus visible partout.
+- Keep only recent bulletins in GCP; local SQLite holds the longer article
+  history.
+- Do not commit `.env`, generated audio, SQLite files, Android keys or GCP
+  credentials.
+- If generation is too slow, lower `CURSOR_NEWS_MAX_ARTICLES` before changing
+  model or architecture.

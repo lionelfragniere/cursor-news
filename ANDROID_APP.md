@@ -1,40 +1,55 @@
 # Cursor News Android
 
-MVP natif Android pour lire Cursor News avec le texte au premier plan.
+Native Android app for Cursor News, including Android Auto media playback.
 
-## Fonctionnalites v0.1
+## Features
 
-- Charge `manifest.json` et `news.json` depuis le bucket GCP public.
-- Affiche les actualites texte avec recherche locale.
-- Filtre par periode: 24 dernieres heures, aujourd'hui, 7 jours, tout.
-- Masque les articles lus par defaut.
-- Sauvegarde les articles lus dans les preferences Android.
-- Mini-lecteur audio pour le flash en cours.
-- Ouvre l'article source dans le navigateur du telephone.
+- Loads `manifest.json` and `news.json` from the public GCP bucket.
+- Displays scraped articles with local search and filters.
+- Supports French and English article filters.
+- Hides read articles by default.
+- Saves read state and filter preferences locally on the device.
+- Offers a "Tout lu" action with confirmation.
+- Plays the current bulletin and the latest bulletin by topic.
+- Android Auto exposes the audio experience as a media app.
 
-## Build Windows
+## Build Debug APK
 
-Android Studio et le SDK doivent etre installes. Le script force le JDK embarque d'Android Studio:
+Android Studio and the Android SDK must be installed.
 
 ```cmd
 scripts\build_android_debug.cmd
 ```
 
-APK genere:
+Output:
 
 ```text
 android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## Installation sur telephone ou emulateur
+Install on a connected device:
 
 ```cmd
 %LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe install -r android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## Suite utile
+If several devices are connected:
 
-- Ajouter une vraie navigation archive/detail.
-- Ajouter un lecteur audio avec notification media.
-- Ajouter des filtres region/source comme sur le site.
-- Ajouter un mode hors-ligne avec cache local.
+```cmd
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe devices
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe -s DEVICE_ID install -r android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+## Build Play Store Bundle
+
+```cmd
+scripts\build_android_release.cmd
+```
+
+Output:
+
+```text
+android\app\build\outputs\bundle\release\app-release.aab
+```
+
+Publication details: `PLAY_STORE_PUBLISHING.md`

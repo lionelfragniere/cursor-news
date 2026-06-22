@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Prototype local de web-radio d'actualites automatisee, CPU-only et migrable Windows."
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
+license = "MIT"
 dependencies = [
     "apscheduler>=3.10.4",
     "beautifulsoup4>=4.12.3",

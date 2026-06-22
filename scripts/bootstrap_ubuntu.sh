@@ -71,7 +71,7 @@ Bootstrap terminé.
 Étapes manuelles à faire une fois:
   gcloud auth login
   gcloud config set project cursor-news-radio-20260517
-  ollama pull qwen3:14b
+  ollama pull gemma3:12b
 
 Puis tester:
   scripts/run_tick_ubuntu.sh
