@@ -112,8 +112,8 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     @contextmanager
-    def connect(self) -> Iterator[sqlite3.Connection]:
-        con = sqlite3.connect(self.path)
+    def connect(self, timeout: float = 5.0) -> Iterator[sqlite3.Connection]:
+        con = sqlite3.connect(self.path, timeout=timeout)
         con.row_factory = sqlite3.Row
         con.execute("PRAGMA foreign_keys=ON")
         try:
@@ -191,11 +191,11 @@ class Database:
                 (etag, modified, utc_now(), utc_now(), source_name),
             )
 
-    def upsert_article(self, article: ArticleInput) -> tuple[int | None, bool]:
+    def upsert_article(self, article: ArticleInput, *, archive_only: bool = False) -> tuple[int | None, bool]:
         now = utc_now()
         url_hash = canonical_hash(article.url)
         is_sports = 1 if is_sports_text(article.title, article.summary, article.content) else 0
-        with self.connect() as con:
+        with self.connect(timeout=300.0 if archive_only else 5.0) as con:
             source = con.execute("SELECT id, region FROM sources WHERE name = ?", (article.source_name,)).fetchone()
             if not source:
                 raise ValueError(f"Unknown source: {article.source_name}")
@@ -203,8 +203,8 @@ class Database:
             cur = con.execute(
                 """
                 INSERT OR IGNORE INTO articles
-                    (source_id, title, url, url_hash, published_at, scraped_at, summary, content, language, is_sports, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (source_id, title, url, url_hash, published_at, scraped_at, summary, content, language, is_sports, created_at, updated_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     int(source["id"]),
@@ -219,9 +219,13 @@ class Database:
                     is_sports,
                     now,
                     now,
+                    "archived" if archive_only else "new",
                 ),
             )
             if cur.rowcount == 0:
+                if archive_only:
+                    row = con.execute("SELECT id FROM articles WHERE url_hash = ?", (url_hash,)).fetchone()
+                    return (int(row["id"]) if row else None, False)
                 con.execute(
                     """
                     UPDATE articles
@@ -293,6 +297,7 @@ class Database:
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
+                  AND a.status != 'archived'
                   {english_clause}
                 ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.used_count ASC
                 LIMIT ?

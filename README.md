@@ -93,6 +93,10 @@ bash scripts/check_ubuntu_server.sh
 
 Full notes: `UBUNTU_SERVER_SETUP.md`
 
+After downtime, [recover missing articles from public archives](docs/ARTICLE_RECOVERY.md).
+The recovery tool backs up SQLite, preserves publication dates and keeps historical
+imports out of spoken bulletins.
+
 ## Android
 
 Debug build:
