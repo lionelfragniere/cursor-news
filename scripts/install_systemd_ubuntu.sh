@@ -25,7 +25,7 @@ After=network-online.target
 Type=oneshot
 Environment=CURSOR_NEWS_AUTO_GIT_PULL=1
 ExecStart=$RUNNER_PATH
-TimeoutStartSec=1800
+TimeoutStartSec=3600
 Nice=5
 IOSchedulingClass=best-effort
 IOSchedulingPriority=6
