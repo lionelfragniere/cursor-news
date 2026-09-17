@@ -138,3 +138,17 @@ def test_export_site_news_keeps_german_web_only(tmp_path: Path, monkeypatch):
 
     assert [item["language"] for item in android_payload["articles"]] == ["fr"]
     assert {item["language"] for item in web_payload["articles"]} == {"fr", "de"}
+
+
+def test_excluded_articles_are_never_exported(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    settings = load_settings()
+    db = Database(settings.database_path)
+    db.init()
+    db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss"))
+    db.upsert_article(ArticleInput("Fixture", "Reference guide", "https://example.test/guide", None, "Details", ""))
+    assert db.exclude_article("https://example.test/guide")
+    for include_all in (False, True):
+        payload = export_site_news(settings, tmp_path / "news.json", include_sports=include_all,
+                                   include_english=include_all, include_german=include_all)
+        assert payload["articles"] == []

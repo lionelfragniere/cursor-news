@@ -63,3 +63,21 @@ flock -n data/cache/tick.lock .venv/bin/cursor-news publish-gcp --news-limit 300
 The website's archive can only search the articles included in that exported
 snapshot. Older recovered articles remain in SQLite even when outside the
 snapshot's size limit. Recovery does not increase cloud retention or upload audio.
+
+## Publication dates and excluded pages
+
+RSS timestamps are interpreted in UTC, independently of the server timezone.
+When an incoming publication timestamp is in the future, ingestion replaces it
+with the current collection timestamp and logs a warning. If that URL already
+has a valid past timestamp, that timestamp is retained so repeated ingestion
+does not continually resurface the same article. A later valid date supplied by
+the publisher can replace this fallback. Missing dates remain missing.
+
+A source can declare `exclude_urls` in `config/sources.yml` for documentary pages
+that must not become news. The Fribourg parliamentary guide is excluded this way.
+Collection skips these URLs and marks any existing matching record `excluded`,
+even if the RSS response is unchanged. Excluded records are omitted from article
+lists, exports and future radio selection. They stay in SQLite to prevent
+reimport and preserve references from previously generated bulletins; this does
+not rewrite old recordings. Removing a URL from configuration does not by itself
+restore a record already marked `excluded`.

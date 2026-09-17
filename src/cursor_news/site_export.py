@@ -47,7 +47,7 @@ def _export_articles(
     include_english: bool,
     include_german: bool,
 ) -> list[dict]:
-    filters: list[str] = []
+    filters: list[str] = ["a.status != 'excluded'"]
     if not include_sports:
         filters.append("a.is_sports = 0")
     if not include_english:

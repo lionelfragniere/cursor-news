@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from calendar import timegm
 from dataclasses import replace
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from time import mktime
 from typing import Any
 
 import feedparser
@@ -38,6 +38,8 @@ class FeedIngestor:
         return {"sources": results, "new_articles": total_new}
 
     def _ingest_source(self, client: httpx.Client, source: FeedSource) -> dict[str, Any]:
+        for url in source.exclude_urls:
+            self.db.exclude_article(canonicalize_url(url))
         cache = self.db.source_cache(source.name)
         headers = {
             "User-Agent": "CursorNews/0.1 RSS prototype",
@@ -78,7 +80,8 @@ class FeedIngestor:
     def _fetch_feed(self, client: httpx.Client, url: str, headers: dict[str, str]) -> tuple[httpx.Response | None, bytes]:
         try:
             response = client.get(url, headers=headers)
-            response.raise_for_status()
+            if response.status_code != 304:
+                response.raise_for_status()
             return response, response.content
         except httpx.HTTPError:
             curl_path = shutil.which("curl.exe") or shutil.which("curl")
@@ -105,6 +108,8 @@ class FeedIngestor:
         title = normalize_text(getattr(entry, "title", ""))
         link = canonicalize_url(getattr(entry, "link", ""))
         if not title or not link:
+            return None
+        if link in {canonicalize_url(url) for url in source.exclude_urls}:
             return None
 
         summary = strip_html(getattr(entry, "summary", ""))
@@ -160,12 +165,19 @@ def _entry_date(entry: Any) -> str | None:
     for attr in ("published_parsed", "updated_parsed"):
         value = getattr(entry, attr, None)
         if value:
-            return datetime.fromtimestamp(mktime(value), tz=timezone.utc).isoformat(timespec="seconds")
+            # feedparser returns UTC tuples, regardless of the server timezone.
+            return datetime.fromtimestamp(timegm(value), tz=timezone.utc).isoformat(timespec="seconds")
     for attr in ("published", "updated"):
         raw = getattr(entry, attr, None)
         if raw:
             try:
-                return parsedate_to_datetime(raw).astimezone(timezone.utc).isoformat(timespec="seconds")
-            except Exception:
-                return str(raw)
+                parsed = parsedate_to_datetime(raw)
+            except (TypeError, ValueError, OverflowError):
+                try:
+                    parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc).isoformat(timespec="seconds")
     return None

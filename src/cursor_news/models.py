@@ -15,6 +15,7 @@ class FeedSource:
     interval_minutes: int = 5
     max_entries: int = 20
     enabled: bool = True
+    exclude_urls: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

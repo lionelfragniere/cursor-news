@@ -1,4 +1,7 @@
 from pathlib import Path
+from dataclasses import replace
+
+import pytest
 
 from cursor_news.database import Database
 from cursor_news.models import ArticleInput, BulletinDraft, FeedSource, StyleSlot
@@ -135,3 +138,46 @@ def test_article_language_is_stored_per_article(tmp_path: Path):
 
     assert article_id is not None
     assert archive[0]["language"] == "de"
+
+
+@pytest.mark.parametrize("date", ["2026-12-07T10:09:18+01:00", "2026-12-07T09:09:18Z", "2026-12-07T09:09:18"])
+def test_future_dates_are_clamped_once_and_past_dates_preserved(tmp_path, monkeypatch, date):
+    monkeypatch.setattr("cursor_news.database.utc_now", lambda: "2026-09-17T08:00:00+00:00")
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss"))
+    article = ArticleInput("Fixture", "Public information", "https://example.test/news", date, "Details", "")
+    db.upsert_article(article)
+    assert db.article_archive()[0]["published_at"] == "2026-09-17T08:00:00+00:00"
+    monkeypatch.setattr("cursor_news.database.utc_now", lambda: "2026-09-18T08:00:00+00:00")
+    db.upsert_article(article)
+    assert db.article_archive()[0]["published_at"] == "2026-09-17T08:00:00+00:00"
+    # A valid publisher correction replaces the fallback date.
+    corrected = replace(article, published_at="2026-09-16T10:00:00+02:00")
+    db.upsert_article(corrected)
+    assert db.article_archive()[0]["published_at"] == corrected.published_at
+    db.upsert_article(article)
+    assert db.article_archive()[0]["published_at"] == corrected.published_at
+
+
+def test_exclusion_survives_reingestion_and_keeps_bulletin_history(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource(name="Fixture", url="https://example.test/rss"))
+    article = ArticleInput("Fixture", "Reference guide", "https://example.test/guide", None, "Details", "")
+    article_id, _ = db.upsert_article(article)
+    selected = db.list_candidate_articles(10)
+    assert db.exclude_article(article.url)
+    # A bulletin already generating when exclusion happens must not undo it.
+    db.create_bulletin("history", "2026-09-17T08:00:00+00:00", StyleSlot("test", "Test", ""),
+                       BulletinDraft("Test", "", "Test"), selected)
+    assert db.upsert_article(article) == (article_id, False)
+    assert db.upsert_article(article, archive_only=True) == (article_id, False)
+    db.init()
+    assert db.list_candidate_articles(10, include_english=True) == []
+    assert db.list_recent_articles(10, include_english=True) == []
+    assert db.article_archive(include_sports=True) == []
+    assert db.article_archive(include_sports=False) == []
+    assert db.bulletin_by_id("history")["sources"][0]["url"] == article.url
+    with db.connect() as con:
+        assert con.execute("SELECT status FROM articles WHERE id=?", (article_id,)).fetchone()[0] == "excluded"

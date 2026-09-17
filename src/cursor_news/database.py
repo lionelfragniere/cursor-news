@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -11,6 +12,8 @@ from typing import Iterator
 from .article_filter import is_sports_text
 from .language import detect_article_language, normalize_article_language
 from .models import Article, ArticleInput, AudioResult, BulletinDraft, FeedSource, StyleSlot
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -196,6 +199,18 @@ class Database:
         url_hash = canonical_hash(article.url)
         is_sports = 1 if is_sports_text(article.title, article.summary, article.content) else 0
         with self.connect(timeout=300.0 if archive_only else 5.0) as con:
+            existing = con.execute(
+                "SELECT id, status, published_at FROM articles WHERE url_hash = ?", (url_hash,)
+            ).fetchone()
+            if existing and (archive_only or existing["status"] == "excluded"):
+                return int(existing["id"]), False
+            published_at = article.published_at
+            published = _parse_datetime(published_at)
+            if published and published > datetime.fromisoformat(now):
+                previous = _parse_datetime(existing["published_at"]) if existing else None
+                # A repeated invalid feed date must not refresh the article forever.
+                published_at = existing["published_at"] if previous and previous <= datetime.fromisoformat(now) else now
+                logger.warning("Future publication date for %s (%s); using %s", article.url, article.published_at, published_at)
             source = con.execute("SELECT id, region FROM sources WHERE name = ?", (article.source_name,)).fetchone()
             if not source:
                 raise ValueError(f"Unknown source: {article.source_name}")
@@ -211,7 +226,7 @@ class Database:
                     article.title,
                     article.url,
                     url_hash,
-                    article.published_at,
+                    published_at,
                     now,
                     article.summary,
                     article.content,
@@ -241,7 +256,7 @@ class Database:
                     """,
                     (
                         article.title,
-                        article.published_at,
+                        published_at,
                         article.summary,
                         article.content,
                         language,
@@ -255,6 +270,14 @@ class Database:
                 return (int(row["id"]) if row else None, False)
             row = con.execute("SELECT id FROM articles WHERE url_hash = ?", (url_hash,)).fetchone()
             return int(row["id"]), True
+
+    def exclude_article(self, url: str) -> bool:
+        with self.connect() as con:
+            result = con.execute(
+                "UPDATE articles SET status = 'excluded', updated_at = ? WHERE url_hash = ?",
+                (utc_now(), canonical_hash(url)),
+            )
+            return result.rowcount > 0
 
     def list_candidate_articles(self, limit: int, include_english: bool = False) -> list[Article]:
         english_clause = "" if include_english else "AND s.region != 'english'"
@@ -297,7 +320,7 @@ class Database:
                 FROM articles a
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
-                  AND a.status != 'archived'
+                  AND a.status NOT IN ('archived', 'excluded')
                   {english_clause}
                 ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.used_count ASC
                 LIMIT ?
@@ -362,7 +385,7 @@ class Database:
                     (bulletin_id, article.id),
                 )
                 con.execute(
-                    "UPDATE articles SET status = 'used', used_count = used_count + 1, updated_at = ? WHERE id = ?",
+                    "UPDATE articles SET status = CASE WHEN status = 'excluded' THEN status ELSE 'used' END, used_count = used_count + 1, updated_at = ? WHERE id = ?",
                     (now, article.id),
                 )
 
@@ -448,7 +471,9 @@ class Database:
         return [dict(row) for row in rows]
 
     def article_archive(self, limit: int = 50, include_sports: bool = True) -> list[dict]:
-        where = "" if include_sports else "WHERE a.is_sports = 0"
+        where = "WHERE a.status != 'excluded'"
+        if not include_sports:
+            where += " AND a.is_sports = 0"
         with self.connect() as con:
             rows = con.execute(
                 f"""
@@ -532,7 +557,7 @@ def _parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
     if parsed.tzinfo is None:

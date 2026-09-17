@@ -38,6 +38,8 @@ sources:
     url: https://www.fr.ch/rss.xml
     region: suisse-romande
     priority: 118
+    exclude_urls:
+      - https://www.fr.ch/parlinfo/guide-parlementaire
 
   - name: Franceinfo - Titres
     url: https://www.franceinfo.fr/titres.rss

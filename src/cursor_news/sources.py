@@ -23,6 +23,7 @@ def load_sources(path: Path) -> list[FeedSource]:
                 interval_minutes=int(merged.get("interval_minutes", 5)),
                 max_entries=int(merged.get("max_entries", 20)),
                 enabled=bool(merged.get("enabled", True)),
+                exclude_urls=tuple(str(url) for url in merged.get("exclude_urls", [])),
             )
         )
     return sources
