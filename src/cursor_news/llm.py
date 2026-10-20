@@ -16,7 +16,7 @@ class LLMClient(Protocol):
 
 
 class OllamaLLMClient:
-    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = True, num_threads: int = 4):
+    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = True, num_threads: int = 3):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds

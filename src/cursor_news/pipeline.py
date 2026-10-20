@@ -243,7 +243,7 @@ class CursorNewsPipeline:
     ) -> BulletinDraft:
         draft: BulletinDraft | None = None
         issue = ""
-        max_attempts = 2 if style.key == "flash_horaire" else 3
+        max_attempts = 1 if style.key == "flash_horaire" else 3
         for _attempt in range(max_attempts):
             try:
                 if draft is None:

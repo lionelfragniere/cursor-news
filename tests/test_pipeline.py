@@ -2,7 +2,9 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from cursor_news.models import ArticleInput, BulletinDraft, FeedSource
+import pytest
+
+from cursor_news.models import ArticleInput, BulletinDraft, FeedSource, StyleSlot
 from cursor_news.pipeline import CursorNewsPipeline, DraftRejectedError, _draft_quality_issue
 from cursor_news.settings import load_settings
 
@@ -628,6 +630,36 @@ def test_pipeline_security_selection_does_not_backfill_unrelated_news(tmp_path: 
 def test_draft_quality_issue_rejects_short_llm_output():
     draft = BulletinDraft(title="Court", summary="", transcript="Trop court.")
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
+
+
+@pytest.mark.parametrize("style_key, can_revise", [("flash_horaire", False), ("suisse", True)])
+def test_hourly_flash_avoids_a_second_cpu_pass(tmp_path, monkeypatch, style_key, can_revise):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    pipeline = CursorNewsPipeline(load_settings())
+
+    class Client:
+        generated = 0
+        revised = 0
+
+        def generate_bulletin(self, *args):
+            self.generated += 1
+            return BulletinDraft("Court", "", "Trop court.")
+
+        def revise_bulletin(self, *args):
+            self.revised += 1
+            return BulletinDraft("Valide", "", " ".join(["actualité"] * 300))
+
+    client = Client()
+    style = StyleSlot(style_key, "Flash", "")
+    if can_revise:
+        pipeline._generate_validated_llm_draft(client, [], style, datetime.now())
+        assert client.revised == 1
+    else:
+        with pytest.raises(DraftRejectedError, match="short transcript"):
+            pipeline._generate_validated_llm_draft(client, [], style, datetime.now())
+        assert client.revised == 0
+    assert client.generated == 1
 
 
 def test_draft_quality_accepts_radio_length_valid_llm_output():

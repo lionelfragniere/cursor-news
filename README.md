@@ -90,9 +90,9 @@ manual drafting. Android and Android Auto read the new flash label from the
 existing manifest and do not need an app update.
 
 An hour is attempted once, including after a failure or process restart. There
-are at most two text quality attempts within that run; if the text or voice
+is only one text generation attempt within that run; if the text or voice
 fails, the last published audio remains available until a later successful
-hour. `OLLAMA_NUM_THREADS=4` limits inference threads, and the model is unloaded
+hour. `OLLAMA_NUM_THREADS=3` limits inference threads, and the model is unloaded
 after each response. Unchanged SQLite schemas no longer trigger archive-wide
 reclassification at every initialization.
 

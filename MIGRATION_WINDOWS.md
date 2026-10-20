@@ -21,10 +21,10 @@ ollama list
 tools\ffmpeg\bin\ffmpeg.exe -version
 ```
 
-Le modele LLM attendu par defaut est `qwen3:14b`. Si absent :
+Le modele LLM attendu par defaut est `gemma3:12b`. Si absent :
 
 ```cmd
-ollama pull qwen3:14b
+ollama pull gemma3:12b
 ```
 
 ## 2. Copier le projet

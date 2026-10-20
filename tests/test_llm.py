@@ -121,7 +121,7 @@ def test_ollama_client_disables_thinking_in_api_payload(monkeypatch):
     assert captured[0]["think"] is False
     assert captured[0]["format"] == "json"
     assert captured[0]["keep_alive"] == 0
-    assert captured[0]["options"]["num_thread"] == 4
+    assert captured[0]["options"]["num_thread"] == 3
 
 
 def test_template_llm_generates_transcript():
