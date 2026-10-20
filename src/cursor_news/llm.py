@@ -16,11 +16,12 @@ class LLMClient(Protocol):
 
 
 class OllamaLLMClient:
-    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = True):
+    def __init__(self, base_url: str, model: str, timeout_seconds: float = 180.0, json_format: bool = True, num_threads: int = 4):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.json_format = json_format
+        self.num_threads = max(1, num_threads)
 
     def generate_bulletin(self, articles: list[Article], style: StyleSlot, slot_start: datetime) -> BulletinDraft:
         prompt = build_prompt(articles, style, slot_start)
@@ -49,7 +50,9 @@ class OllamaLLMClient:
             "prompt": prompt,
             "stream": False,
             "think": False,
+            "keep_alive": 0,
             "options": {
+                "num_thread": self.num_threads,
                 "temperature": temperature,
                 "num_ctx": 8192,
                 "num_predict": num_predict,

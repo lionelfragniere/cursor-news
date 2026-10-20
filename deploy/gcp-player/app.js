@@ -4,6 +4,7 @@ const APP_TIME_ZONE = "Europe/Zurich";
 
 const state = {
   articles: [],
+  topicSummaries: [],
   generatedAt: null,
   readIds: new Set(),
   filters: {
@@ -45,6 +46,8 @@ const els = {
   reset: document.querySelector("#reset-filters"),
   title: document.querySelector("#result-title"),
   list: document.querySelector("#news-list"),
+  topicSummaries: document.querySelector("#topic-summaries"),
+  topicSummariesDrawer: document.querySelector("#topic-summaries-drawer"),
 };
 
 function normalize(value) {
@@ -272,6 +275,7 @@ function matchesDateRange(article) {
 
 function render() {
   const items = filteredArticles();
+  renderTopicSummaries();
   els.title.textContent = `${items.length} actualité${items.length > 1 ? "s" : ""} - ${dateRangeLabel()}`;
   updateStatus();
   if (!items.length) {
@@ -279,6 +283,34 @@ function render() {
     return;
   }
   els.list.replaceChildren(...items.slice(0, 80).map(renderArticle));
+}
+
+function renderTopicSummaries() {
+  if (!els.topicSummaries) return;
+  const topics = state.topicSummaries.filter(topic => topic.language !== "en" || state.filters.includeEnglish);
+  els.topicSummariesDrawer.hidden = topics.length === 0;
+  els.topicSummaries.replaceChildren(...topics.map(topic => {
+    const section = document.createElement("details");
+    const label = document.createElement("summary");
+    label.textContent = topic.label;
+    section.lang = topic.language;
+    section.append(label);
+    for (const item of topic.articles) {
+      const link = document.createElement("a");
+      link.textContent = item.title;
+      link.href = item.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.addEventListener("click", () => setRead(item, true));
+      const text = document.createElement("p");
+      text.textContent = item.summary || "";
+      const source = document.createElement("p");
+      source.className = "meta";
+      source.textContent = `${item.source_name} · ${formatDate(item.published_at)}`;
+      section.append(link, text, source);
+    }
+    return section;
+  }));
 }
 
 function renderArticle(article) {
@@ -376,7 +408,7 @@ function renderBulletinGrid(items) {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "Les bulletins par sujet apparaîtront après les prochains cycles de génération.";
+    empty.textContent = "Le prochain flash Suisse et monde apparaîtra après sa publication.";
     els.bulletinGrid.replaceChildren(empty);
     return;
   }
@@ -465,6 +497,7 @@ async function init() {
     state.generatedAt = payload.generated_at || null;
     state.readIds = loadReadIds();
     state.articles = payload.articles || [];
+    state.topicSummaries = payload.topic_summaries || [];
     setupFilters(payload);
     updateFromControls();
   } catch (error) {

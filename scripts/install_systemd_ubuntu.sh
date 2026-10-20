@@ -26,18 +26,19 @@ Type=oneshot
 Environment=CURSOR_NEWS_AUTO_GIT_PULL=1
 ExecStart=$RUNNER_PATH
 TimeoutStartSec=3600
-Nice=5
+Nice=10
+CPUQuota=200%
 IOSchedulingClass=best-effort
 IOSchedulingPriority=6
 EOF
 
 cat > "$SYSTEMD_DIR/cursor-news-tick.timer" <<'EOF'
 [Unit]
-Description=Run Cursor News every hour
+Description=Refresh Cursor News every ten minutes with hourly audio
 
 [Timer]
 OnBootSec=2min
-OnCalendar=*:00:00
+OnCalendar=*:0/10:00
 Persistent=true
 RandomizedDelaySec=20
 Unit=cursor-news-tick.service

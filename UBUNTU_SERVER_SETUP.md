@@ -6,7 +6,7 @@ The laptop handles:
 
 - RSS ingestion;
 - SQLite article storage;
-- hourly topic bulletin generation;
+- one hourly general audio flash and lightweight text topic digests;
 - female French and English TTS voices through Edge TTS;
 - MP3 generation in mono 64 kbps;
 - upload of public JSON, transcripts and audio files to GCP.
@@ -78,6 +78,9 @@ EDGE_TTS_VOICE=fr-CH-ArianeNeural
 LLM_PROVIDER=ollama
 OLLAMA_MODEL=gemma3:12b
 OLLAMA_TIMEOUT_SECONDS=1800
+OLLAMA_NUM_THREADS=4
+CURSOR_NEWS_BUFFER_SLOTS=1
+CURSOR_NEWS_GENERATE_MAX_PER_TICK=1
 ```
 
 ## 4. Install Dependencies
@@ -104,8 +107,9 @@ Run one full cycle:
 bash scripts/run_tick_ubuntu.sh
 ```
 
-The tick ingests RSS, updates the database, generates needed bulletins, renders
-audio and publishes the public files.
+The tick ingests RSS, updates the database, generates at most one general
+audio flash for the current hour and publishes the public files. Topic digests
+reuse recent article summaries, without extra LLM or TTS calls.
 
 Check the server:
 
@@ -113,7 +117,7 @@ Check the server:
 bash scripts/check_ubuntu_server.sh
 ```
 
-## 6. Hourly Automation
+## 6. Automation
 
 Install the systemd user timer:
 
@@ -129,8 +133,12 @@ systemctl --user list-timers cursor-news-tick.timer
 journalctl --user -u cursor-news-tick.service -n 120 --no-pager
 ```
 
-The timer runs at the start of each hour. It also performs a safe
-`git pull --ff-only` before each tick when the working tree is clean.
+The timer refreshes news every ten minutes, with audio attempted only once per
+hour and no future-hour buffer. It also performs a safe `git pull --ff-only`
+before each tick when the working tree is clean. Re-run the installer after an
+upgrade to update existing systemd units. The generator uses four inference
+threads by default (`OLLAMA_NUM_THREADS`) and unloads its model after each
+response. A failed hour is not retried continuously; the next hour can try again.
 
 ## 7. Public Site
 

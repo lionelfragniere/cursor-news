@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .article_filter import (
@@ -59,14 +59,26 @@ class CursorNewsPipeline:
         run_id = self.db.start_run("generate")
         generated: list[str] = []
         try:
-            for slot_start in self.schedule.upcoming_slots(self.settings.buffer_slots, now=now):
+            slot_count = 1 if self.schedule.audio_style else self.settings.buffer_slots
+            for slot_start in self.schedule.upcoming_slots(slot_count, now=now):
                 slot_iso = slot_start.isoformat(timespec="seconds")
                 if self.db.bulletin_exists(slot_iso):
                     continue
+                attempt_id = self.db.claim_audio_slot(slot_iso) if self.schedule.audio_style else None
+                if self.schedule.audio_style and attempt_id is None:
+                    continue
                 try:
                     bulletin_id = self.generate_slot(slot_start)
-                except DraftRejectedError:
+                except DraftRejectedError as exc:
+                    if attempt_id is not None:
+                        self.db.finish_run(attempt_id, "rejected", str(exc))
                     continue
+                except Exception as exc:
+                    if attempt_id is not None:
+                        self.db.finish_run(attempt_id, "error", str(exc))
+                    raise
+                if attempt_id is not None:
+                    self.db.finish_run(attempt_id, "ok" if bulletin_id else "skipped", bulletin_id or "No usable news")
                 if not bulletin_id:
                     continue
                 generated.append(bulletin_id)
@@ -82,7 +94,7 @@ class CursorNewsPipeline:
         self.db.init()
         slot_iso = slot_start.isoformat(timespec="seconds")
         style = self.schedule.style_for(slot_start)
-        articles = self._select_articles(style)
+        articles = self._select_articles(style, now=slot_start)
         if not articles:
             return None
         draft = self._draft_bulletin(articles, style, slot_start)
@@ -106,14 +118,18 @@ class CursorNewsPipeline:
         return style, articles, self._draft_bulletin(articles, style, slot_start)
 
     def _style_by_key(self, style_key: str) -> StyleSlot:
+        if self.schedule.audio_style and self.schedule.audio_style.key == style_key:
+            return self.schedule.audio_style
         for style in self.schedule.rotation:
             if style.key == style_key:
                 return style
         raise ValueError(f"Unknown style key: {style_key}")
 
-    def _select_articles(self, style: StyleSlot | str | None = None) -> list[Article]:
+    def _select_articles(self, style: StyleSlot | str | None = None, now: datetime | None = None) -> list[Article]:
         style_key, language = self._style_selection_context(style)
         target_articles = min(self.settings.max_articles, 7)
+        if style_key == "flash_horaire":
+            return self._select_general_articles(target_articles, now)
         pool_size = max(target_articles * 5, 30)
         include_english = language == "en"
         if include_english or style_key in {"valais", "suisse_romande", "suisse", "international", "security_world"}:
@@ -144,6 +160,27 @@ class CursorNewsPipeline:
         selected = unique_articles_by_topic(selected) if style_key == "enfant" else diversify_articles_by_topic(selected)
         return selected[:target_articles]
 
+    def _select_general_articles(self, limit: int, now: datetime | None) -> list[Article]:
+        cutoff = ((now or datetime.now(timezone.utc)) - timedelta(hours=24)).isoformat(timespec="seconds")
+        pool = self.db.list_recent_articles(500, published_after=cutoff)
+        pool = unique_articles_by_story(filter_low_value_articles(filter_sports_articles(pool)))
+        pool = _filter_articles_by_language(pool, "fr")
+        local = diversify_articles_by_topic(rank_articles_for_topic(
+            [a for a in pool if a.region in {"suisse", "suisse-romande", "valais"}], "suisse"
+        ))
+        world = diversify_articles_by_topic(rank_articles_for_topic(
+            [a for a in pool if a.region in {"international", "europe", "france", "francophonie"}], "international"
+        ))
+        selected = []
+        for index in range(max(len(local), len(world))):
+            if index < len(local):
+                selected.append(local[index])
+            if index < len(world):
+                selected.append(world[index])
+            if len(selected) >= limit:
+                break
+        return selected[:limit]
+
     def _style_selection_context(self, style: StyleSlot | str | None) -> tuple[str | None, str]:
         if isinstance(style, StyleSlot):
             return style.key, style.language
@@ -166,6 +203,7 @@ class CursorNewsPipeline:
                 self.settings.ollama_model,
                 self.settings.ollama_timeout_seconds,
                 self.settings.ollama_json_format,
+                self.settings.ollama_num_threads,
             )
             draft = self._generate_validated_llm_draft(client, articles, style, slot_start)
         else:
@@ -205,7 +243,8 @@ class CursorNewsPipeline:
     ) -> BulletinDraft:
         draft: BulletinDraft | None = None
         issue = ""
-        for _attempt in range(3):
+        max_attempts = 2 if style.key == "flash_horaire" else 3
+        for _attempt in range(max_attempts):
             try:
                 if draft is None:
                     draft = client.generate_bulletin(articles, style, slot_start)

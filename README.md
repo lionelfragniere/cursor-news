@@ -14,12 +14,14 @@ Public instance: https://cursor.fragniere.li/
   international news, UN-relevant news, English international news and global
   security.
 - Local article archive with deduplication, read/unread state and filters.
-- Hourly topic bulletins, around 8 minutes when enough articles are available.
+- One French hourly audio flash covering the main Swiss and world news.
+- Seven text topic digests, assembled from recent article summaries without
+  additional LLM or voice generation.
 - French bulletins use French articles only; English bulletins use English
   articles only.
 - Online Edge TTS voices by default, with local TTS alternatives kept available.
 - MP3 output in mono 64 kbps to keep storage and bandwidth low.
-- Web UI with current flash, latest flash by topic, transcripts and archives.
+- Web UI with the hourly flash, text topic digests, transcripts and archives.
 - Native Android app with Android Auto media support.
 
 ## Architecture
@@ -79,9 +81,20 @@ bash scripts/run_tick_ubuntu.sh
 bash scripts/install_systemd_ubuntu.sh
 ```
 
-The systemd user timer runs one tick every hour. Each tick does a safe
-`git pull --ff-only` when the working tree is clean, ingests news, generates the
-needed bulletin buffer, renders audio and publishes the public files.
+The systemd user timer refreshes news every ten minutes. Each tick does a safe
+`git pull --ff-only` when the working tree is clean, ingests news and publishes
+the public files. Audio generation is limited to the current hourly slot, with
+no advance buffer. The default `audio` entry in `config/schedule.yml` controls
+the general flash; `rotation` retains the seven themes for text digests and
+manual drafting. Android and Android Auto read the new flash label from the
+existing manifest and do not need an app update.
+
+An hour is attempted once, including after a failure or process restart. There
+are at most two text quality attempts within that run; if the text or voice
+fails, the last published audio remains available until a later successful
+hour. `OLLAMA_NUM_THREADS=4` limits inference threads, and the model is unloaded
+after each response. Unchanged SQLite schemas no longer trigger archive-wide
+reclassification at every initialization.
 
 Useful server commands:
 

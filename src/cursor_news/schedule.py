@@ -17,6 +17,7 @@ class ProgramSchedule:
     default_duration_minutes: int
     styles: dict[str, StyleSlot]
     rotation: list[StyleSlot]
+    audio_style: StyleSlot | None = None
 
     @classmethod
     def load(cls, path: Path) -> "ProgramSchedule":
@@ -37,6 +38,7 @@ class ProgramSchedule:
             default_duration_minutes=int(data.get("default_duration_minutes", 4)),
             styles=styles,
             rotation=rotation,
+            audio_style=_style_from_mapping(data["audio"]) if data.get("audio") else None,
         )
 
     def floor_slot(self, now: datetime | None = None) -> datetime:
@@ -50,6 +52,8 @@ class ProgramSchedule:
         return [start + timedelta(minutes=self.slot_minutes * offset) for offset in range(count)]
 
     def style_for(self, slot_start: datetime) -> StyleSlot:
+        if self.audio_style:
+            return self.audio_style
         if self.rotation:
             local = slot_start.astimezone(ZoneInfo(self.timezone))
             slot_index = ((local.hour * 60) + local.minute) // self.slot_minutes

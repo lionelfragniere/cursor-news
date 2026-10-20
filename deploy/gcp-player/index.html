@@ -38,11 +38,11 @@
               ></audio>
               <a id="bulletin-audio-link" href="https://storage.googleapis.com/cursor-news-radio-20260517-audio/current/live.mp3">MP3</a>
             </div>
-            <details class="bulletins-drawer header-bulletins" aria-label="Bulletins audio par sujet">
+            <details class="bulletins-drawer header-bulletins" aria-label="Flash audio horaire">
               <summary>
                 <div>
                   <span class="eyebrow">Audio à la carte</span>
-                  <strong>Écouter les derniers flashs par sujet</strong>
+                  <strong>Le flash Suisse et monde</strong>
                 </div>
               </summary>
               <div class="bulletin-grid" id="bulletin-grid"></div>
@@ -126,6 +126,11 @@
         </section>
       </details>
 
+      <details class="filters-drawer" id="topic-summaries-drawer" hidden>
+        <summary><strong>Synthèses thématiques</strong></summary>
+        <div class="topic-summaries" id="topic-summaries"></div>
+      </details>
+
       <section class="news-head">
         <div>
           <p class="eyebrow">News scrappées</p>
@@ -135,6 +140,6 @@
 
       <section class="news-list" id="news-list" aria-live="polite"></section>
     </main>
-    <script src="/app.js?v=20260520-languages"></script>
+    <script src="/app.js?v=20261020-hourly"></script>
   </body>
 </html>

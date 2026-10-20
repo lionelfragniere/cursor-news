@@ -38,7 +38,8 @@ def publish_to_gcp(settings: Settings, news_limit: int = 500) -> list[str]:
     db = Database(settings.database_path)
     db.init()
     current = db.current_bulletin()
-    allowed_topic_keys = {style.key for style in ProgramSchedule.load(settings.schedule_path).rotation}
+    schedule = ProgramSchedule.load(settings.schedule_path)
+    allowed_topic_keys = {schedule.audio_style.key} if schedule.audio_style else {style.key for style in schedule.rotation}
     bulletins_by_topic = latest_bulletins_by_topic(
         db.bulletin_history(limit=240),
         limit=settings.gcp_topic_archive_limit,

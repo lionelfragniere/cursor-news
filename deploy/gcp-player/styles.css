@@ -207,6 +207,32 @@ summary:focus-visible {
   padding: 0;
 }
 
+.topic-summaries {
+  padding: 0 16px 12px;
+}
+
+.topic-summaries > details {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.topic-summaries summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.topic-summaries a {
+  color: var(--accent);
+  display: block;
+  font-weight: 700;
+  margin-top: 14px;
+  overflow-wrap: anywhere;
+}
+
+.topic-summaries p {
+  margin: 4px 0;
+}
+
 .transcript-head {
   align-items: center;
   display: flex;

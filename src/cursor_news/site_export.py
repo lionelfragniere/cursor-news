@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .article_filter import anxiety_score, calm_score, is_child_unsuitable_article, story_key
+from .article_filter import anxiety_score, calm_score, is_child_unsuitable_article, rank_articles_for_topic, story_key, topic_relevance_score
 from .database import Database
-from .models import Article
+from .models import Article, StyleSlot
+from .schedule import ProgramSchedule
 from .settings import Settings
 
 
@@ -35,9 +36,45 @@ def export_site_news(
         "languages": sorted({item["language"] for item in articles if item["language"]}),
         "sources": sorted({item["source_name"] for item in articles if item["source_name"]}),
         "articles": articles,
+        "topic_summaries": build_topic_summaries(articles, ProgramSchedule.load(settings.schedule_path).rotation)
+        if settings.schedule_path.exists() else [],
     }
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return payload
+
+
+def build_topic_summaries(items: list[dict], topics: list[StyleSlot], now: datetime | None = None) -> list[dict]:
+    current = now or datetime.now(timezone.utc)
+    cutoff = current - timedelta(hours=24)
+    articles = []
+    by_id = {}
+    for item in items:
+        try:
+            published = datetime.fromisoformat((item.get("published_at") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=timezone.utc)
+        if not cutoff <= published <= current or item.get("is_sports"):
+            continue
+        article = Article(
+            id=item["id"], source_name=item["source_name"], title=item["title"], url=item["url"],
+            published_at=item["published_at"], summary=item.get("summary", ""), content="",
+            region=item["region"], language=item.get("language", "unknown"), priority=item.get("priority", 50),
+        )
+        articles.append(article)
+        by_id[article.id] = item
+    summaries = []
+    for topic in topics:
+        focused = [a for a in articles if a.language == topic.language and topic_relevance_score(a, topic.key) > 0]
+        selected = rank_articles_for_topic(focused, topic.key)[:3]
+        if selected:
+            summaries.append({
+                "topic_key": topic.key, "label": topic.label, "language": topic.language,
+                "articles": [{key: by_id[a.id].get(key) for key in
+                              ("id", "title", "summary", "url", "source_name", "published_at")} for a in selected],
+            })
+    return summaries
 
 
 def _export_articles(

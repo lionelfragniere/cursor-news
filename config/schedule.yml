@@ -1,9 +1,16 @@
 timezone: Europe/Zurich
 slot_minutes: 60
-default_duration_minutes: 8
-target_words_min: 980
-target_words_max: 1240
+default_duration_minutes: 4
+target_words_min: 350
+target_words_max: 550
 
+audio:
+  key: flash_horaire
+  label: Suisse et monde
+  language: fr
+  prompt: "Un seul flash général par heure, en français. Couvrir les grandes nouvelles suisses et mondiales, avec 2 à 3 sujets suisses et 2 à 3 sujets internationaux si les sources le permettent. Prioriser les décisions publiques, l'économie, la santé, l'environnement et la diplomatie. Rester précis, fluide et factuel, sans sport ni remplissage."
+
+# These themes remain available as text summaries and manual drafts.
 rotation:
   - key: suisse_romande
     label: Suisse romande

@@ -181,3 +181,37 @@ def test_exclusion_survives_reingestion_and_keeps_bulletin_history(tmp_path):
     assert db.bulletin_by_id("history")["sources"][0]["url"] == article.url
     with db.connect() as con:
         assert con.execute("SELECT status FROM articles WHERE id=?", (article_id,)).fetchone()[0] == "excluded"
+
+
+def test_init_does_not_reclassify_the_entire_existing_archive(tmp_path, monkeypatch):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource("Fixture", "https://example.test/rss"))
+    db.upsert_article(ArticleInput("Fixture", "Football : un match annonce", "https://example.test/news", None, "Details", ""))
+    def unexpected(*args, **kwargs):
+        raise AssertionError("An unchanged schema must not reclassify articles")
+    monkeypatch.setattr("cursor_news.database.is_sports_text", unexpected)
+    db.init()
+
+
+def test_legacy_columns_are_backfilled_once(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    db.upsert_source(FeedSource("Fixture", "https://example.test/rss"))
+    db.upsert_article(ArticleInput("Fixture", "Football : le club change d'entraineur", "https://example.test/news", None,
+                                  "Le club presente son nouvel entraineur de football.", ""))
+    with db.connect() as con:
+        con.execute("ALTER TABLE articles DROP COLUMN is_sports")
+        con.execute("ALTER TABLE articles DROP COLUMN language")
+    db.init()
+    assert db.article_archive()[0]["is_sports"] == 1
+
+
+def test_audio_claim_is_retained_after_a_failed_attempt(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.init()
+    run_id = db.claim_audio_slot("2026-10-20T10:00:00+02:00")
+    assert run_id is not None
+    db.finish_run(run_id, "error", "Voice service unavailable")
+    assert db.claim_audio_slot("2026-10-20T10:00:00+02:00") is None
+    assert db.claim_audio_slot("2026-10-20T11:00:00+02:00") is not None

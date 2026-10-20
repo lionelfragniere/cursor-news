@@ -3,7 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from cursor_news.models import ArticleInput, BulletinDraft, FeedSource
-from cursor_news.pipeline import CursorNewsPipeline, _draft_quality_issue
+from cursor_news.pipeline import CursorNewsPipeline, DraftRejectedError, _draft_quality_issue
 from cursor_news.settings import load_settings
 
 
@@ -24,7 +24,7 @@ def test_pipeline_generates_with_template_and_tone(tmp_path: Path, monkeypatch):
             source_name="Fixture",
             title="Une nouvelle liaison ferroviaire est annoncée",
             url="https://example.test/train",
-            published_at="2026-05-17T12:00:00+02:00",
+            published_at="2026-01-01T00:00:00+01:00",
             summary="Le canton présente une mesure de mobilité publique.",
             content="",
         )
@@ -703,3 +703,45 @@ def test_pipeline_international_selection_does_not_backfill_local_news(tmp_path:
     selected = pipeline._select_articles("international")
 
     assert [article.title for article in selected] == ["Europe: les dirigeants discutent d'un nouvel accord"]
+
+
+def test_hourly_audio_does_not_prefetch_or_retry_rejected_hour(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_BUFFER_SLOTS", "3")
+    pipeline = CursorNewsPipeline(load_settings())
+    calls = []
+    def reject(slot):
+        calls.append(slot)
+        raise DraftRejectedError("No reliable draft")
+    monkeypatch.setattr(pipeline, "generate_slot", reject)
+    now = datetime.fromisoformat("2026-10-20T10:12:00+02:00")
+    assert pipeline.generate_buffer(now) == []
+    # Simulate a process restart: the guard lives in SQLite.
+    restarted = CursorNewsPipeline(pipeline.settings)
+    monkeypatch.setattr(restarted, "generate_slot", reject)
+    assert restarted.generate_buffer(now.replace(minute=42)) == []
+    assert len(calls) == 1
+    assert restarted.generate_buffer(now.replace(hour=11)) == []
+    assert len(calls) == 2
+    assert all(slot.minute == 0 for slot in calls)
+
+
+def test_general_flash_balances_fresh_swiss_and_world_news(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
+    monkeypatch.setenv("CURSOR_NEWS_CONFIG_DIR", str(Path.cwd() / "config"))
+    monkeypatch.setenv("CURSOR_NEWS_MAX_ARTICLES", "5")
+    pipeline = CursorNewsPipeline(load_settings())
+    pipeline.init_db()
+    rows = [
+        ("Swiss", "suisse-romande", "fr", "2026-10-20T08:00:00+00:00", "Le Conseil federal annonce une mesure de sante publique"),
+        ("World", "international", "fr", "2026-10-20T08:00:00+00:00", "Les dirigeants europeens ouvrent des discussions diplomatiques"),
+        ("BBC", "english", "en", "2026-10-20T08:00:00+00:00", "World leaders discuss a new agreement"),
+        ("Old", "suisse", "fr", "2026-10-17T08:00:00+00:00", "La Suisse ouvre un nouveau programme scientifique"),
+    ]
+    for name, region, language, date, title in rows:
+        pipeline.db.upsert_source(FeedSource(name=name, url=f"https://example.test/{name}/rss", region=region))
+        pipeline.db.upsert_article(ArticleInput(name, title, f"https://example.test/{name}", date,
+                                              "Une nouvelle decision est presentee avec des faits confirmes.", "", language))
+    selected = pipeline._select_articles("flash_horaire", now=datetime.fromisoformat("2026-10-20T10:00:00+00:00"))
+    assert [a.source_name for a in selected] == ["Swiss", "World"]

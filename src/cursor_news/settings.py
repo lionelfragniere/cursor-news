@@ -40,6 +40,7 @@ class Settings:
     ollama_model: str
     ollama_timeout_seconds: float
     ollama_json_format: bool
+    ollama_num_threads: int
     tts_engine: str
     tts_model_name: str
     edge_tts_voice: str
@@ -120,8 +121,8 @@ def load_settings() -> Settings:
         timezone=os.getenv("CURSOR_NEWS_TIMEZONE", "Europe/Zurich"),
         host=os.getenv("CURSOR_NEWS_HOST", "0.0.0.0"),
         port=int(os.getenv("CURSOR_NEWS_PORT", "8000")),
-        buffer_slots=max(1, int(os.getenv("CURSOR_NEWS_BUFFER_SLOTS", "3"))),
-        generate_max_per_tick=max(1, int(os.getenv("CURSOR_NEWS_GENERATE_MAX_PER_TICK", "2"))),
+        buffer_slots=max(1, int(os.getenv("CURSOR_NEWS_BUFFER_SLOTS", "1"))),
+        generate_max_per_tick=max(1, int(os.getenv("CURSOR_NEWS_GENERATE_MAX_PER_TICK", "1"))),
         max_articles=max(1, int(os.getenv("CURSOR_NEWS_MAX_ARTICLES", "7"))),
         ingest_interval_minutes=max(1, int(os.getenv("CURSOR_NEWS_INGEST_INTERVAL_MINUTES", "5"))),
         generate_interval_seconds=max(10, int(os.getenv("CURSOR_NEWS_GENERATE_INTERVAL_SECONDS", "60"))),
@@ -130,6 +131,7 @@ def load_settings() -> Settings:
         ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
         ollama_timeout_seconds=max(60.0, float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "600"))),
         ollama_json_format=_as_bool(os.getenv("OLLAMA_JSON_FORMAT"), True),
+        ollama_num_threads=max(1, int(os.getenv("OLLAMA_NUM_THREADS", "4"))),
         tts_engine=os.getenv("TTS_ENGINE", "piper").lower(),
         tts_model_name=os.getenv("TTS_MODEL_NAME") or os.getenv("COQUI_MODEL_NAME", "models/piper/fr_FR-siwis-medium/fr_FR-siwis-medium.onnx"),
         edge_tts_voice=os.getenv("EDGE_TTS_VOICE", "fr-CH-ArianeNeural"),

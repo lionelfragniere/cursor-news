@@ -3,7 +3,9 @@ from pathlib import Path
 from cursor_news.database import Database
 from cursor_news.models import ArticleInput, FeedSource
 from cursor_news.settings import load_settings
-from cursor_news.site_export import export_site_news
+from cursor_news.site_export import build_topic_summaries, export_site_news
+from cursor_news.models import StyleSlot
+from datetime import datetime
 
 
 def test_export_site_news_writes_filter_metadata(tmp_path: Path, monkeypatch):
@@ -152,3 +154,16 @@ def test_excluded_articles_are_never_exported(tmp_path, monkeypatch):
         payload = export_site_news(settings, tmp_path / "news.json", include_sports=include_all,
                                    include_english=include_all, include_german=include_all)
         assert payload["articles"] == []
+
+
+def test_topic_summaries_use_recent_matching_language_sources():
+    now = datetime.fromisoformat("2026-10-20T10:00:00+00:00")
+    base = {"source_name":"RFI", "summary":"Des discussions diplomatiques ont lieu.", "region":"international",
+            "language":"fr", "published_at":"2026-10-20T09:00:00+00:00", "title":"Les pays europeens discutent d'un accord"}
+    items = [{**base, "id":1, "url":"https://example.test/new"},
+             {**base, "id":2, "url":"https://example.test/old", "published_at":"2026-10-18T09:00:00+00:00"},
+             {**base, "id":3, "url":"https://example.test/en", "language":"en"}]
+    result = build_topic_summaries(items, [StyleSlot("international", "International", "")], now=now)
+    assert len(result) == 1
+    assert [a["id"] for a in result[0]["articles"]] == [1]
+    assert result[0]["articles"][0]["summary"] == base["summary"]

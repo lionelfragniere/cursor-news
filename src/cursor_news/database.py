@@ -311,7 +311,7 @@ class Database:
             for row in rows
         ]
 
-    def list_recent_articles(self, limit: int, include_english: bool = False) -> list[Article]:
+    def list_recent_articles(self, limit: int, include_english: bool = False, published_after: str | None = None) -> list[Article]:
         english_clause = "" if include_english else "AND s.region != 'english'"
         with self.connect() as con:
             rows = con.execute(
@@ -321,11 +321,12 @@ class Database:
                 JOIN sources s ON s.id = a.source_id
                 WHERE a.is_sports = 0
                   AND a.status NOT IN ('archived', 'excluded')
+                  AND (? IS NULL OR julianday(COALESCE(a.published_at, a.created_at)) >= julianday(?))
                   {english_clause}
                 ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.used_count ASC
                 LIMIT ?
                 """,
-                (limit,),
+                (published_after, published_after, limit),
             ).fetchall()
         return [
             Article(
@@ -539,6 +540,17 @@ class Database:
             )
             return int(cur.lastrowid)
 
+    def claim_audio_slot(self, slot_start: str) -> int | None:
+        kind = f"audio:{slot_start}"
+        with self.connect() as con:
+            cur = con.execute(
+                """INSERT INTO pipeline_runs (kind, status, started_at)
+                   SELECT ?, 'running', ?
+                   WHERE NOT EXISTS (SELECT 1 FROM pipeline_runs WHERE kind = ?)""",
+                (kind, utc_now(), kind),
+            )
+            return int(cur.lastrowid) if cur.rowcount else None
+
     def finish_run(self, run_id: int, status: str, message: str = "") -> None:
         with self.connect() as con:
             con.execute(
@@ -567,10 +579,15 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 def _migrate(con: sqlite3.Connection) -> None:
     article_columns = {row["name"] for row in con.execute("PRAGMA table_info(articles)").fetchall()}
+    needs_backfill = False
     if "is_sports" not in article_columns:
         con.execute("ALTER TABLE articles ADD COLUMN is_sports INTEGER NOT NULL DEFAULT 0")
+        needs_backfill = True
     if "language" not in article_columns:
         con.execute("ALTER TABLE articles ADD COLUMN language TEXT NOT NULL DEFAULT 'unknown'")
+        needs_backfill = True
+    if not needs_backfill:
+        return
     rows = con.execute(
         """
         SELECT a.id, a.title, a.summary, a.content, a.language, s.region
