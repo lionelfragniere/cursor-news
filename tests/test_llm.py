@@ -52,6 +52,29 @@ def test_build_prompt_english_keeps_un_briefing_in_english():
     assert "Sources used for this edition" in prompt
 
 
+def test_prompt_prefers_rss_summary_over_noisy_page_content():
+    article = Article(
+        id=1, source_name="Euronews", title="Des critiques sur la politique migratoire",
+        url="https://example.test/news", published_at=None,
+        summary="Le dirigeant a critiqué la politique migratoire de son homologue.",
+        content="Panne chez Google Cloud. Copier/coller le lien. PUBLICITÉ. Autre vidéo.",
+    )
+    prompt = build_prompt([article], StyleSlot("flash_horaire", "Suisse et monde", ""), datetime.now())
+    assert article.summary in prompt
+    assert "Google Cloud" not in prompt
+    assert "PUBLICITÉ" not in prompt
+
+
+def test_prompt_preserves_clean_detailed_article_content():
+    article = Article(
+        id=1, source_name="Fixture", title="Une annonce économique",
+        url="https://example.test/news", published_at=None, summary="Un résumé bref.",
+        content="Le groupe annonce une participation de 51 pour cent, sous réserve des autorisations.",
+    )
+    prompt = build_prompt([article], StyleSlot("suisse", "Suisse", ""), datetime.now())
+    assert article.content in prompt
+
+
 def test_ollama_client_disables_thinking_in_api_payload(monkeypatch):
     captured: list[dict] = []
 

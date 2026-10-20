@@ -367,6 +367,8 @@ def _article_block(articles: list[Article]) -> str:
 
 def _article_prompt_text(index: int, article: Article) -> str:
     body = article.content or article.summary
+    if article.summary and not _usable_template_excerpt(body, article.title):
+        body = article.summary
     body = " ".join(body.split())
     if len(body) > 900:
         body = body[:900].rsplit(" ", 1)[0] + "..."
@@ -890,6 +892,10 @@ def _usable_template_excerpt(text: str, title: str) -> bool:
         r"\bcontinue reading\b",
         r"\bsign up here\b",
         r"\bnewsletter\b",
+        r"copier/coller",
+        r"\bchargement de la video\b",
+        r"\bpublicite\b",
+        r"\badvertisement\b",
     )
     return not any(re.search(pattern, normalized) for pattern in noisy_patterns)
 
