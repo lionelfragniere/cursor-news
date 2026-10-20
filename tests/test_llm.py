@@ -33,6 +33,8 @@ def test_build_prompt_requires_radio_script_not_rss_reading():
     assert "Ne pas réciter les titres RSS" in prompt
     assert "Choisir 3 à 5 sujets maximum" in prompt
     assert "Sources utilisées pour cette édition" in prompt
+    assert "350 à 450 mots" in prompt
+    assert article.url not in prompt
 
 
 def test_build_prompt_english_keeps_un_briefing_in_english():

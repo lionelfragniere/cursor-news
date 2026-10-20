@@ -267,36 +267,22 @@ def _build_french_prompt(article_block: str, style: StyleSlot, slot_start: datet
     guidance = _subject_guidance(style)
     return f"""
 /no_think
-Tu es la rédactrice en chef et présentatrice de Cursor News, un flash radio d'actualité pour la Suisse romande.
-
-Le texte sera lu tel quel par une voix de synthèse. Écris donc pour l'oreille: phrases nettes, ponctuation utile, transitions naturelles, aucune mise en page destinée à être vue.
+Tu es la journaliste radio de Cursor News, pour la Suisse romande. Écris un script français fluide qui sera lu tel quel, pas une liste de titres.
 
 Créneau: {slot_start.isoformat()}
 Sujet du flash: {style.label}
 Consigne éditoriale: {style.prompt}
 Angle spécifique: {guidance}
 
-Mission:
-- Produire un bulletin d'environ 3 à 4 minutes, entre 350 et 550 mots.
-- Choisir 3 à 5 sujets maximum dans le paquet de sources. Ignore les articles faibles, doublons ou hors sujet.
-- Ouvrir par une accroche sobre qui donne l'angle du bulletin, pas par une formule générique.
-- Pour chaque sujet: lancer l'information, expliquer seulement le contexte présent dans les sources, puis dire ce qui est confirmé, prévu ou incertain.
-- N'invente jamais un impact pour la Suisse ou la Suisse romande. Mentionne un effet suisse/romand seulement s'il est explicitement dans l'article.
-- Écrire comme une journaliste radio: fluide, incarné, précis, mais sans dramatiser.
-- Ne pas réciter les titres RSS. Les titres servent à comprendre le sujet, pas à être lus tels quels.
-- Ne pas empiler "D'abord", "Ensuite", "Autre point" à chaque paragraphe. Varie les transitions et laisse respirer le texte.
-- Ne pas inventer de chiffres, dates, citations, causalités ou réactions absentes des sources.
-- Distinguer clairement ce qui est confirmé, annoncé, prévu, contesté ou encore incertain.
-- Exclure le sport strict: résultats, matches, transferts, entraîneurs, compétitions, classements.
-- Ne cite aucun média dans les sujets: pas de "selon", pas de "source:", pas de nom de journal dans les transitions.
-- Mets les crédits de sources uniquement dans la dernière phrase, exactement sous la forme: "Sources utilisées pour cette édition: ...".
-- Termine par une conclusion courte qui ferme le flash sans slogan.
-
-Interdits de style:
-- Pas de numérotation visible: "Point 1", "Sujet 1", "Alerte 1".
-- Pas de phrases méta ou creuses: "il y a une situation à comprendre", "dit simplement", "l'enjeu maintenant", "ce dossier montre que".
-- Pas de paragraphe qui se contente de répéter une catégorie comme "une information culturelle" ou "des responsables prennent des décisions".
-- Pas de markdown, pas de listes à puces, pas d'indications de respiration ou de régie.
+Contrat éditorial:
+- Le champ transcript doit contenir 350 à 450 mots, et pas seulement une phrase par article.
+- Choisir 3 à 5 sujets maximum. Développe chaque information en un paragraphe d'environ 70 à 90 mots lorsque les faits disponibles le permettent.
+- Commence par l'information principale, sans salutation. Enchaîne avec des transitions variées, des phrases courtes et une ponctuation naturelle.
+- Ne pas réciter les titres RSS. Pas de listes, de markdown, de slogans ou de commentaires sur ta rédaction.
+- Utilise uniquement les faits du paquet. Aucun chiffre, contexte, citation, réaction ou impact suisse inventé pour allonger. Privilégie la fidélité si les sources sont pauvres.
+- Respecte les nuances: une candidature n'est pas une élection, une opération annoncée n'est pas finalisée, une projection n'est pas un résultat définitif. Attribue clairement les opinions à leur auteur.
+- Écarte les doublons, le sport et les formules creuses comme "il y a une situation à comprendre" ou "ce dossier montre que".
+- Cite les médias seulement dans la dernière phrase: "Sources utilisées pour cette édition: ...".
 
 Paquet de sources:
 {article_block}
@@ -378,7 +364,6 @@ def _article_prompt_text(index: int, article: Article) -> str:
         f"- Region: {article.region}\n"
         f"- Detected language: {article.language}\n"
         f"- Title: {article.title}\n"
-        f"- URL: {article.url}\n"
         f"- Date: {article.published_at or 'unknown'}\n"
         f"- Content: {body}"
     )
