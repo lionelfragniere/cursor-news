@@ -95,6 +95,11 @@ fails, the last published audio remains available until a later successful
 hour. `OLLAMA_NUM_THREADS=3` limits inference threads, and the model is unloaded
 after each response. Unchanged SQLite schemas no longer trigger archive-wide
 reclassification at every initialization.
+The hourly flash can be concise (at least 240 words) instead of triggering
+another writing pass solely to reach the preferred length.
+
+Measured lightweight-model trials and their quality limitations are documented
+in [CPU Model Tests](docs/CPU_MODEL_TESTS.md).
 
 Useful server commands:
 

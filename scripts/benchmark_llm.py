@@ -54,7 +54,7 @@ def main() -> int:
             )
             raw_draft = asdict(draft)
             draft = _normalize_draft_for_quality(draft, articles, style)
-            issue = _draft_quality_issue(draft)
+            issue = _draft_quality_issue(draft, style)
             result = {
                 "raw_draft": raw_draft, "draft": asdict(draft),
                 "words": len(draft.transcript.split()), "quality_issue": issue,

@@ -254,7 +254,7 @@ class CursorNewsPipeline:
                 raise DraftRejectedError(f"LLM draft failed for {style.label}: {exc}") from exc
 
             draft = _normalize_draft_for_quality(draft, articles, style)
-            issue = _draft_quality_issue(draft)
+            issue = _draft_quality_issue(draft, style)
             if not issue:
                 return draft
         raise DraftRejectedError(f"LLM draft rejected for {style.label}: {issue}")
@@ -374,7 +374,7 @@ def _normalize_draft_for_quality(draft: BulletinDraft, articles: list[Article], 
     return enforce_source_credit_at_end(draft, articles, language=language)
 
 
-def _draft_quality_issue(draft: BulletinDraft) -> str | None:
+def _draft_quality_issue(draft: BulletinDraft, style: StyleSlot | None = None) -> str | None:
     word_count = len(draft.transcript.split())
     warning_text = " ".join(draft.warnings).lower()
     transcript = draft.transcript.lower()
@@ -406,7 +406,8 @@ def _draft_quality_issue(draft: BulletinDraft) -> str | None:
     for phrase in generic_child_phrases:
         if phrase in transcript:
             return f"LLM returned generic radio filler: {phrase}"
-    if word_count < 280:
+    minimum_words = 240 if style and style.key == "flash_horaire" else 280
+    if word_count < minimum_words:
         return f"LLM returned a short transcript ({word_count} words)"
     repeated = _repeated_paragraph_opening(draft.transcript)
     if repeated:

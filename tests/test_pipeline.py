@@ -632,6 +632,14 @@ def test_draft_quality_issue_rejects_short_llm_output():
     assert _draft_quality_issue(draft) == "LLM returned a short transcript (2 words)"
 
 
+@pytest.mark.parametrize("key, words, accepted", [
+    ("flash_horaire", 240, True), ("flash_horaire", 239, False), ("suisse", 240, False),
+])
+def test_hourly_flash_can_be_compact_without_relaxing_manual_topics(key, words, accepted):
+    draft = BulletinDraft("Flash", "", " ".join(["actualité"] * words))
+    assert (_draft_quality_issue(draft, StyleSlot(key, "Flash", "")) is None) is accepted
+
+
 @pytest.mark.parametrize("style_key, can_revise", [("flash_horaire", False), ("suisse", True)])
 def test_hourly_flash_avoids_a_second_cpu_pass(tmp_path, monkeypatch, style_key, can_revise):
     monkeypatch.setenv("CURSOR_NEWS_HOME", str(tmp_path))
