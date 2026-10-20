@@ -161,8 +161,8 @@ def enforce_source_credit_at_end(draft: BulletinDraft, articles: list[Article], 
     transcript = draft.transcript.strip()
     for article in articles:
         transcript = _remove_source_references(transcript, article.source_name, preserve_newlines=True)
-    transcript = re.sub(r"\n*\s*(?:Les\s+)?sources utilisées pour cette édition\s*:.*$", "", transcript, flags=re.S | re.I)
-    transcript = re.sub(r"\n*\s*(?:The\s+)?sources used for this edition\s*:.*$", "", transcript, flags=re.S | re.I)
+    transcript = re.sub(r"(?:Les\s+)?sources utilisées pour cette édition\s*:[^\r\n]*", "", transcript, flags=re.I)
+    transcript = re.sub(r"(?:The\s+)?sources used for this edition\s*:[^\r\n]*", "", transcript, flags=re.I)
     transcript = _remove_meta_fillers(transcript)
     transcript = _format_body_paragraphs(transcript)
     if articles:

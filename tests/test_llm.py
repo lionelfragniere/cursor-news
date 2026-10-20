@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from cursor_news.llm import (
     OllamaLLMClient,
     TemplateLLMClient,
@@ -390,6 +392,21 @@ def test_enforce_source_credit_removes_llm_source_sentence_variant():
     )
     assert draft.transcript.count("Sources utilisées pour cette édition:") == 1
     assert "France 24, RFI" not in draft.transcript
+
+
+@pytest.mark.parametrize("language, credit", [
+    ("fr", "Sources utilisées pour cette édition: RFI."),
+    ("en", "Sources used for this edition: RFI."),
+])
+def test_misplaced_source_credits_do_not_discard_later_news(language, credit):
+    article = Article(1, "RFI", "Titre", "https://example.test", None, "", "")
+    draft = BulletinDraft("Titre", "", f"Première information.\n\n{credit}\n\nDeuxième information à conserver.")
+    result = enforce_source_credit_at_end(draft, [article], language)
+    assert "Première information." in result.transcript
+    assert "Deuxième information à conserver." in result.transcript
+    assert result.transcript.count(credit) == 1
+    assert result.transcript.endswith(credit)
+    assert enforce_source_credit_at_end(result, [article], language) == result
 
 
 def test_enforce_source_credit_formats_long_single_block_and_removes_fillers():
