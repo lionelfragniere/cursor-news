@@ -275,7 +275,7 @@ function matchesDateRange(article) {
 
 function render() {
   const items = filteredArticles();
-  renderTopicSummaries();
+  renderTopicSummaries(items);
   els.title.textContent = `${items.length} actualité${items.length > 1 ? "s" : ""} - ${dateRangeLabel()}`;
   updateStatus();
   if (!items.length) {
@@ -285,9 +285,13 @@ function render() {
   els.list.replaceChildren(...items.slice(0, 80).map(renderArticle));
 }
 
-function renderTopicSummaries() {
+function renderTopicSummaries(visibleArticles) {
   if (!els.topicSummaries) return;
-  const topics = state.topicSummaries.filter(topic => topic.language !== "en" || state.filters.includeEnglish);
+  const visibleIds = new Set(visibleArticles.map(item => String(item.id)));
+  const topics = state.topicSummaries
+    .filter(topic => topic.language !== "en" || state.filters.includeEnglish)
+    .map(topic => ({ ...topic, articles: topic.articles.filter(item => visibleIds.has(String(item.id))) }))
+    .filter(topic => topic.articles.length);
   els.topicSummariesDrawer.hidden = topics.length === 0;
   els.topicSummaries.replaceChildren(...topics.map(topic => {
     const section = document.createElement("details");
